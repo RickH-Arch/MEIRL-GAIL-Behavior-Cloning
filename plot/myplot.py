@@ -96,7 +96,7 @@ def Surface3D(z_mat,x,y,x_name = "",y_name = ""):
     fig.update_traces(contours_z=dict(show=True, usecolormap=True,
                                   highlightcolor="limegreen", project_z=True))
     fig.update_layout( autosize=False,
-                    scene_camera_eye=dict(x=1.87, y=0.88, z=-0.64),
+                    scene_camera_eye=dict(x=1.87, y=-1.5, z=0.64),
                     width=500, height=500,
                     margin=dict(l=20, r=20, b=20, t=20)
     )
