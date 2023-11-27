@@ -90,3 +90,21 @@ def Date_Mac_3D_scatter(df,x_name,y_name,z_name,species_name):
     # tight layout
     fig.update_layout(margin=dict(l=0, r=0, b=0, t=0))
     fig.show()
+
+def Surface3D(z_mat,x,y,x_name = "",y_name = ""):
+    fig = go.Figure(data=[go.Surface(z=z_mat, x=x, y=y)])
+    fig.update_traces(contours_z=dict(show=True, usecolormap=True,
+                                  highlightcolor="limegreen", project_z=True))
+    fig.update_layout( autosize=False,
+                    scene_camera_eye=dict(x=1.87, y=0.88, z=-0.64),
+                    width=500, height=500,
+                    margin=dict(l=20, r=20, b=20, t=20)
+    )
+    if x_name != "":
+         fig.update_xaxes(title_text="<b>eps</b>")
+    # if y_name != "":
+    #     fig.update_yaxes(title_text="<b>%i</b>"%y_name)
+    fig.show()
+
+
+
