@@ -42,12 +42,12 @@ def My_DBSCAN(df_cluster,eps,min_samples,cal_dbcv = False):
     cluster_labels = labels
 
     if len(set(cluster.labels_)) <= 2:
-        cluster_n = len(set(cluster.labels_))
+        cluster_n = len(set(cluster.labels_)) - (1 if -1 in cluster.labels_ else 0)
         
         silhouette = -1
-        calinski = 0
+        calinski = -1
         noise_n = 0
-        dbcv = -1
+        dbcv=-1
     else:
         cluster_n = (len(set(cluster.labels_)) - (1 if -1 in cluster.labels_ else 0))#delete npise
         #get noise num
@@ -81,8 +81,8 @@ def My_DBSCAN_MATRIX(df_cluster,init_eps,step_eps,epoch_eps,init_mSamples,step_m
     多次聚类, 确定效果最佳的eps与min_samples
     '''
     results = []
-    for i in (range(epoch_eps)):
-        for j in tqdm(range(epoch_mSamples)):
+    for i in tqdm(range(epoch_eps),desc='on dbscan...'):
+        for j in (range(epoch_mSamples)):
         #eps表示样本点的领域半径，min_samples表示样本点在领域半径内的最小数量
             result = My_DBSCAN(df_cluster,init_eps+i*step_eps,init_mSamples+j*step_mSamples,cal_DBCV)
             results.append(result) 
