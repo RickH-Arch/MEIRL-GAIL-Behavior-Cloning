@@ -72,7 +72,7 @@ def My_DBSCAN(df_cluster,eps,min_samples,cal_dbcv = False):
         calinski = calinski,
         eps = eps,
         min_samples=min_samples,
-        labels = labels
+        labels = cluster_labels
     )
 
 
