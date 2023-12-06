@@ -68,3 +68,19 @@ def ShowClusterResult(df,col_name_list,cut_thre = 0,cut_col_name = "",cut_mode =
     for name in col_name_list:
         _add_data(df_result,name,data_list)
     myplot.Surface3D_supPlot(data_list)
+
+
+def AddCoupleToDf(df_couple_count,wifi_a,wifi_b):
+    '''
+    Add new couple if not exist, increace count if exist
+    '''
+    get = False
+    df = df_couple_count.copy()
+    for index,row in df.iterrows():
+        if (row['wifi_a'] == wifi_a and row['wifi_b'] == wifi_b) or (row['wifi_a'] == wifi_b and row['wifi_b'] == wifi_a):
+            get = True
+            df.at[index,'count'] += 1
+            break
+    if get == False:
+        df = df._append({'wifi_a':wifi_a,'wifi_b':wifi_b,'count':1},ignore_index = True)
+    return df
