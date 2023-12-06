@@ -187,4 +187,46 @@ def Boxes(list_tuple,box_title = ""):
         fig.update_layout(title_text="Box Plot")
     else :
         fig.update_layout(title_text=box_title)
+    fig.update_layout(
+        width = 400*len(list_tuple),
+        height = 500
+    )
+    fig.show()
+
+def Track_3D(x,y,z,x_name = "",y_name = "",z_name = ""):
+    
+    fig = go.Figure(data=go.Scatter3d(
+        x=x, y=y, z=z,
+        marker=dict(
+            size=4,
+            color=z,
+            colorscale='Viridis',
+        ),
+        line=dict(
+            color='darkblue',
+            width=2
+        )
+    ))
+    fig.update_layout(
+        width=500,
+        height=500,
+        autosize=True,
+        scene=dict(
+            camera=dict(
+                up=dict(
+                    x=0,
+                    y=0,
+                    z=1
+                ),
+                eye=dict(
+                    x=0,
+                    y=1.0707,
+                    z=1,
+                )
+            ),
+            aspectratio = dict( x=1, y=1, z=0.7 ),
+            aspectmode = 'manual'
+        ),
+    )
+
     fig.show()
