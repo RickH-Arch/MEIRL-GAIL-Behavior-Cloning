@@ -8,6 +8,8 @@ import random
 import math
 import os
 
+df_wifipos = pd.read_csv(os.getcwd()+'/../wifi_track_data/dacang/wifi_track_pos&traj/wifi_pos.csv')
+
 def Normalize_arr(arr):
     min_val = np.min(arr)
     max_val = np.max(arr)
@@ -72,14 +74,26 @@ def ShowClusterResult(df,col_name_list,cut_thre = 0,cut_col_name = "",cut_mode =
         _add_data(df_result,name,data_list)
     myplot.Surface3D_supPlot(data_list)
 
+def GetWifiTrackDistance(wifi_a,wifi_b):
+    pp1 = df_wifipos[df_wifipos.wifi == wifi_a].iloc[0]
+    pp2 = df_wifipos[df_wifipos.wifi == wifi_b].iloc[0]
+    pos1 = [pp1.X,pp1.Y]
+    pos2 = [pp2.X,pp2.Y]
+    return round(_getDistance(pos1,pos2),2)
 
-def AddTrackCoupleToDf(df,wifi_a,wifi_b):
+def _getDistance(track1_pos,track2_pos):
+    x = track2_pos[0]-track1_pos[0]
+    y = track2_pos[1]-track1_pos[1]
+    return math.sqrt(x*x + y*y)
+
+
+def AddTrackCoupleToDf(df,wifi_a,wifi_b,switch_t):
     '''
     Add new couple if not exist, increace count if exist, also record couple's distance
     '''
     wifi_a = int(wifi_a)
     wifi_b = int(wifi_b)
-    df_wifipos = pd.read_csv(os.getcwd()+'/../wifi_track_data/dacang/wifi_track_pos&traj/wifi_pos.csv')
+    
     #df = pd.DataFrame({'wifi_a':[],'wifi_b':[],'count':[],'distance':[]})
     get = False
     
@@ -87,20 +101,18 @@ def AddTrackCoupleToDf(df,wifi_a,wifi_b):
         if (row['wifi_a'] == wifi_a and row['wifi_b'] == wifi_b) or (row['wifi_a'] == wifi_b and row['wifi_b'] == wifi_a):
             get = True
             df.at[index,'count'] += 1
+            df.at[index,'meanTime'] += switch_t
             return df
     if get == False:
-        pp1 = df_wifipos[df_wifipos.wifi == wifi_a].iloc[0]
-        pp2 = df_wifipos[df_wifipos.wifi == wifi_b].iloc[0]
-        pos1 = [pp1.X,pp1.Y]
-        pos2 = [pp2.X,pp2.Y]
-        dis = round(GetWifiTrackDistance(pos1,pos2),2)
-        df = df._append({'wifi_a':wifi_a,'wifi_b':wifi_b,'count':1,'distance':dis},ignore_index = True)
+        dis = GetWifiTrackDistance(wifi_a,wifi_b)
+        df = df._append({'wifi_a':wifi_a,'wifi_b':wifi_b,'count':1,'distance':dis,'meanTime':switch_t},ignore_index = True)
     return df
 
 def GetJumpTrackSets(track_list1,track_list2):
     '''
-    get pair of track lists and return jump track sets
-    length of list1 and list2 must equal
+    get pair of track lists and return jump track sets.
+    length of list1 and list2 must equal.
+    a set length is with max length of 3.
     '''
     if len(track_list1) != len(track_list2):
         return
@@ -152,7 +164,3 @@ def Show3DTrack_Origin(df_track,df_wifiPos):
         y.append(df_wifiPos[df_wifiPos.wifi == row.a].iloc[0].Y)
     myplot.Track_3D(x,y,z)
 
-def GetWifiTrackDistance(track1_pos,track2_pos):
-    x = track2_pos[0]-track1_pos[0]
-    y = track2_pos[1]-track1_pos[1]
-    return math.sqrt(x*x + y*y)
