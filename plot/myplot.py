@@ -134,7 +134,7 @@ def Scatter_2D(df,x_name,y_name,bg_img_path = ''):
 
 def Scatter_2D_Subplot(data_tuple_list):
     '''
-    tuple[0]为dataframe
+    tuple[0]为dataframe, tuple[1]为x轴列名, tuple[2]为y轴列名, tuple[3]为label列名
     '''
     name_list = []
     for i in range(len(data_tuple_list)):
@@ -143,6 +143,17 @@ def Scatter_2D_Subplot(data_tuple_list):
         rows = float.__ceil__(len(data_tuple_list)/3),
         cols = 3
     )
+
+    for i in range(data_tuple_list):
+        t = data_tuple_list[i]
+        row_loc = int(i/3)+1
+        col_loc = i%3+1
+        df = t[0]
+        fig.add_trace(go.Scatter(
+            x = df[t[1]],
+            y = df[t[2]],
+
+        ))
     
 
 def Scatter_3D(df,x_name,y_name,z_name,species_name = "",color_name = ""):
