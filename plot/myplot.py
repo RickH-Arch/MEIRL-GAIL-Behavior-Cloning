@@ -2,6 +2,8 @@ import plotly.express as px
 import plotly.io as pio
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import numpy as np
+from PIL import Image
 
 colors = ['rgb(67,67,67)', 'rgb(115,115,115)']
 line_size = [2,2,2,2]
@@ -88,6 +90,60 @@ def Double_Axes_Line(df,xAxis_str,line1_str,line2_str,xAxes_name = "",line1_name
     if xAxes_name != "":
         fig.update_xaxes
     fig.show()
+
+def Scatter_2D(df,x_name,y_name,bg_img_path = ''):
+    fig = go.Figure()
+
+    fig = px.scatter(x=df[x_name], y=df[y_name])
+   
+    if bg_img_path != '':
+        # Add images
+        img = Image.open(bg_img_path)
+        fig.add_layout_image(
+                dict(
+                    source=img,
+                    xref="x", yref="y",
+                    x=0, y=0,  #position of the upper left corner of the image in subplot 1,1
+                    sizex= 400,sizey= 300, #sizex, sizey are set by trial and error
+                    xanchor="left",
+                    yanchor="bottom",
+                    sizing="stretch",
+                    layer="below",
+                    opacity=0.3)
+        )
+    fig.update_layout(
+        width=400,
+        height=300,
+        margin=dict(
+        l=10,
+        r=10,
+        b=10,
+        t=10,
+        pad=4
+        ),
+        #yaxis_range=[0,320],
+        #xaxis_range=[0,420],
+        template="plotly_white"
+    )
+
+    #fig.update_layout(showlegend=False)
+    fig.update_xaxes(visible=False)
+    fig.update_yaxes(visible=False)
+
+    fig.show()
+
+def Scatter_2D_Subplot(data_tuple_list):
+    '''
+    tuple[0]为dataframe
+    '''
+    name_list = []
+    for i in range(len(data_tuple_list)):
+        name_list.append(data_tuple_list[i][3])
+    fig = make_subplots(
+        rows = float.__ceil__(len(data_tuple_list)/3),
+        cols = 3
+    )
+    
 
 def Scatter_3D(df,x_name,y_name,z_name,species_name = "",color_name = ""):
     '''
