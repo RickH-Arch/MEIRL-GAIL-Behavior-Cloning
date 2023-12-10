@@ -74,9 +74,9 @@ def ShowClusterResult(df,col_name_list,cut_thre = 0,cut_col_name = "",cut_mode =
         _add_data(df_result,name,data_list)
     myplot.Surface3D_supPlot(data_list)
 
-def GetWifiTrackDistance(wifi_a,wifi_b):
-    pp1 = df_wifipos[df_wifipos.wifi == wifi_a].iloc[0]
-    pp2 = df_wifipos[df_wifipos.wifi == wifi_b].iloc[0]
+def GetWifiTrackDistance(wifi_a,wifi_b,df_pos):
+    pp1 = df_pos[df_pos.wifi == wifi_a].iloc[0]
+    pp2 = df_pos[df_pos.wifi == wifi_b].iloc[0]
     pos1 = [pp1.X,pp1.Y]
     pos2 = [pp2.X,pp2.Y]
     return round(_getDistance(pos1,pos2),2)
@@ -104,9 +104,56 @@ def AddTrackCoupleToDf(df,wifi_a,wifi_b,switch_t):
             df.at[index,'meanTime'] += switch_t
             return df
     if get == False:
-        dis = GetWifiTrackDistance(wifi_a,wifi_b)
+        dis = GetWifiTrackDistance(wifi_a,wifi_b,df_wifipos)
         df = df._append({'wifi_a':wifi_a,'wifi_b':wifi_b,'count':1,'distance':dis,'meanTime':switch_t},ignore_index = True)
     return df
+
+def GetFirstTrack(df):
+    del_list = []
+    a_now = 0
+    for index,row in df.iterrows():
+        if row.a == a_now:
+            del_list.append(row.mark)
+        else:
+            a_now = row.a
+    return df[df.mark.apply(lambda x : False if x in del_list else True)]
+
+def GetDfNow(df,mac):
+    return df[df.m == mac].sort_values(by='t').reset_index().drop('index',axis=1)
+
+def GetJumpWifiTrack(df_now):
+    #get track switch count
+    last_track = 0
+    df_count = pd.DataFrame({'wifi_a':[],'wifi_b':[],'count':[]})
+
+    for index,row in df_now.iterrows():
+        if last_track == 0:
+            last_track = row.a
+            continue
+        if last_track != row.a:
+            t = df_now.iloc[index].t-df_now.iloc[index - 1].t 
+            df_count = AddTrackCoupleToDf(df_count,last_track,row.a,t)
+            last_track = row.a
+    
+    #get tracks that switch more than 11
+    df_count = df_count[df_count['count']>11]
+    if len(df_count) == 0:
+        return df_count
+
+    #meanTime less than 396
+    df_count.meanTime = df_count.meanTime.apply(lambda x :x.total_seconds())
+    df_count.meanTime = df_count.meanTime/df_count['count']
+    df_count = df_count[df_count.meanTime < 396]
+    if len(df_count) == 0:
+        return df_count
+
+    #distance < 90
+    df_count = df_count[df_count.distance < 90]
+    if len(df_count) == 0:
+        return df_count
+    
+    df_count = df_count.sort_values(by='count',ascending=False)
+    return df_count
 
 def GetJumpTrackSets(track_list1,track_list2):
     '''
@@ -137,7 +184,7 @@ def GetJumpTrackSets(track_list1,track_list2):
 def AddNewWifiTrack(df_wifiposNew,jumpTrack_sets):
     for track_set in jumpTrack_sets:
         #check if existed already
-        info = ','.join(map(str,track_set))
+        info = ':'.join(map(str,track_set))
         if info in df_wifiposNew.isVirtualTrack.values:
             continue
         
@@ -164,3 +211,7 @@ def Show3DTrack_Origin(df_track,df_wifiPos):
         y.append(df_wifiPos[df_wifiPos.wifi == row.a].iloc[0].Y)
     myplot.Track_3D(x,y,z)
 
+def PushValue(list,value,max_len):
+    list.append(value)
+    if(len(list)>max_len):
+        list.pop(0)
