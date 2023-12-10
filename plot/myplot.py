@@ -91,10 +91,12 @@ def Double_Axes_Line(df,xAxis_str,line1_str,line2_str,xAxes_name = "",line1_name
         fig.update_xaxes
     fig.show()
 
-def Scatter_2D(df,x_name,y_name,bg_img_path = ''):
+def Scatter_2D(df,x_name,y_name,label_name = '',bg_img_path = ''):
     fig = go.Figure()
-
-    fig = px.scatter(x=df[x_name], y=df[y_name])
+    if label_name == '':
+        fig = px.scatter(x=df[x_name], y=df[y_name])
+    else:
+        fig = px.scatter(x=df[x_name], y=df[y_name],color=df[label_name])
    
     if bg_img_path != '':
         # Add images
@@ -112,8 +114,10 @@ def Scatter_2D(df,x_name,y_name,bg_img_path = ''):
                     opacity=0.3)
         )
     fig.update_layout(
-        width=400,
+        width=480,
         height=300,
+        autosize = False,
+        
         margin=dict(
         l=10,
         r=10,
@@ -123,7 +127,11 @@ def Scatter_2D(df,x_name,y_name,bg_img_path = ''):
         ),
         #yaxis_range=[0,320],
         #xaxis_range=[0,420],
-        template="plotly_white"
+        template="plotly_white",
+
+        legend = dict(
+            title = ''
+        )
     )
 
     #fig.update_layout(showlegend=False)
@@ -132,8 +140,10 @@ def Scatter_2D(df,x_name,y_name,bg_img_path = ''):
 
     fig.show()
 
-def Scatter_2D_Subplot(data_tuple_list):
+
+def Scatter_2D_Subplot(data_tuple_list,bg_img_path = ""):
     '''
+    !!!unfixed!!!
     tuple[0]为dataframe, tuple[1]为x轴列名, tuple[2]为y轴列名, tuple[3]为label列名
     '''
     name_list = []
@@ -144,7 +154,12 @@ def Scatter_2D_Subplot(data_tuple_list):
         cols = 3
     )
 
-    for i in range(data_tuple_list):
+    img = ""
+    imgs = []
+    if bg_img_path != "":
+        img = Image.open(bg_img_path)
+
+    for i in range(len(data_tuple_list)):
         t = data_tuple_list[i]
         row_loc = int(i/3)+1
         col_loc = i%3+1
@@ -152,8 +167,31 @@ def Scatter_2D_Subplot(data_tuple_list):
         fig.add_trace(go.Scatter(
             x = df[t[1]],
             y = df[t[2]],
-
+            color = df[t[3]],
+            row = row_loc, col = col_loc
         ))
+        
+        if bg_img_path != "":
+            imgs.append(dict(
+                source=img,
+                    xref="x", yref="y",
+                    x=0, y=0,  #position of the upper left corner of the image in subplot 1,1
+                    sizex= 400,sizey= 300, #sizex, sizey are set by trial and error
+                    xanchor="left",
+                    yanchor="bottom",
+                    sizing="stretch",
+                    layer="below",
+                    opacity=0.3
+            ))
+    fig.update_layout(
+        images = imgs,
+        title_text='WiFi Track Position',
+        height=400*float.__ceil__(len(data_tuple_list)/3),
+        width=500 * len(data_tuple_list) if len(data_tuple_list)<3 else 3
+    )
+
+    fig.show()
+
     
 
 def Scatter_3D(df,x_name,y_name,z_name,species_name = "",color_name = ""):
