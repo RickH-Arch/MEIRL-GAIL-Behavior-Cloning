@@ -87,7 +87,7 @@ def _getDistance(track1_pos,track2_pos):
     return math.sqrt(x*x + y*y)
 
 
-def AddTrackCoupleToDf(df,wifi_a,wifi_b,switch_t):
+def AddTrackCoupleToDf(df,wifi_a,wifi_b,switch_t,switch_speed):
     '''
     Add new couple if not exist, increace count if exist, also record couple's distance
     '''
@@ -102,10 +102,12 @@ def AddTrackCoupleToDf(df,wifi_a,wifi_b,switch_t):
             get = True
             df.at[index,'count'] += 1
             df.at[index,'meanTime'] += switch_t
+            if(df.at[index,'maxSpeed']>switch_speed):
+                df.at[index,'maxSpeed'] = switch_speed
             return df
     if get == False:
         dis = GetWifiTrackDistance(wifi_a,wifi_b,df_wifipos)
-        df = df._append({'wifi_a':wifi_a,'wifi_b':wifi_b,'count':1,'distance':dis,'meanTime':switch_t},ignore_index = True)
+        df = df._append({'wifi_a':wifi_a,'wifi_b':wifi_b,'count':1,'distance':dis,'meanTime':switch_t,'maxSpeed':switch_speed},ignore_index = True)
     return df
 
 def GetFirstTrack(df):
@@ -121,7 +123,7 @@ def GetFirstTrack(df):
 def GetDfNow(df,mac):
     return df[df.m == mac].sort_values(by='t').reset_index().drop('index',axis=1)
 
-def GetJumpWifiTrack(df_now):
+def GetJumpWifiTrack(df_now,count_thre,time_thre,dis_thre):
     #get track switch count
     last_track = 0
     df_count = pd.DataFrame({'wifi_a':[],'wifi_b':[],'count':[]})
@@ -135,20 +137,20 @@ def GetJumpWifiTrack(df_now):
             df_count = AddTrackCoupleToDf(df_count,last_track,row.a,t)
             last_track = row.a
     
-    #get tracks that switch more than 11
-    df_count = df_count[df_count['count']>11]
+    #get tracks that switch more than count_thre
+    df_count = df_count[df_count['count']>count_thre]
     if len(df_count) == 0:
         return df_count
 
-    #meanTime less than 396
+    #meanTime less than time_thre
     df_count.meanTime = df_count.meanTime.apply(lambda x :x.total_seconds())
     df_count.meanTime = df_count.meanTime/df_count['count']
-    df_count = df_count[df_count.meanTime < 396]
+    df_count = df_count[(df_count.meanTime < time_thre) | (df_count['count']>50)]
     if len(df_count) == 0:
         return df_count
 
-    #distance < 90
-    df_count = df_count[df_count.distance < 90]
+    #distance less than dis_thre
+    df_count = df_count[(df_count.distance < dis_thre) | (df_count['count']>50)]
     if len(df_count) == 0:
         return df_count
     
@@ -185,7 +187,7 @@ def AddNewWifiTrack(df_wifiposNew,jumpTrack_sets):
     for track_set in jumpTrack_sets:
         #check if existed already
         info = ':'.join(map(str,track_set))
-        if info in df_wifiposNew.isVirtualTrack.values:
+        if info in df_wifiposNew.parents.values:
             continue
         
         #add new track
@@ -198,7 +200,7 @@ def AddNewWifiTrack(df_wifiposNew,jumpTrack_sets):
         
         xx = int(xx/len(track_set))
         yy = int(yy/len(track_set))
-        df_wifiposNew = df_wifiposNew._append({'wifi':newTrack,'X':xx,'Y':yy,'isVirtualTrack':info},ignore_index=True)
+        df_wifiposNew = df_wifiposNew._append({'wifi':newTrack,'X':xx,'Y':yy,'parents':info},ignore_index=True)
     return df_wifiposNew
 
 def Show3DTrack_Origin(df_track,df_wifiPos):
@@ -215,3 +217,5 @@ def PushValue(list,value,max_len):
     list.append(value)
     if(len(list)>max_len):
         list.pop(0)
+
+
