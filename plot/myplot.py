@@ -192,6 +192,62 @@ def Scatter_2D_Subplot(data_tuple_list,bg_img_path = ""):
 
     fig.show()
 
+def Parents_2D(df,bg_img_path = ''):
+    df_virtual = df[df.ID == "virtual"]
+    parents_sets = []
+    for i in range(len(df_virtual)):
+        track_list_now = df_virtual.iloc[i]['parents'].split(':')
+        l_x = []
+        l_y = []
+        for track in track_list_now:
+            row_now = df[df.wifi == int(track)].iloc[0]
+            l_x.append(row_now.X)
+            l_y.append(row_now.Y)
+        l_x.append(l_x[0])
+        l_y.append(l_y[0])
+        parents_sets.append((l_x,l_y))
+    fig = go.Figure()
+    for set in parents_sets:
+        fig.add_trace(go.Scatter(x=set[0], y=set[1],
+                            line=dict(width=1)))
+    if bg_img_path != '':
+        # Add images
+        img = Image.open(bg_img_path)
+        fig.add_layout_image(
+                dict(
+                    source=img,
+                    xref="x", yref="y",
+                    x=0, y=0,  #position of the upper left corner of the image in subplot 1,1
+                    sizex= 400,sizey= 300, #sizex, sizey are set by trial and error
+                    xanchor="left",
+                    yanchor="bottom",
+                    sizing="stretch",
+                    layer="below",
+                    opacity=0.3)
+        )
+
+    fig.update_layout(
+        width=500,
+        height=300,
+        autosize = False,
+        
+        margin=dict(
+        l=10,
+        r=10,
+        b=10,
+        t=10,
+        pad=4
+        ),
+        #yaxis_range=[0,320],
+        #xaxis_range=[0,420],
+        template="plotly_white",
+
+        legend = dict(
+            title = ''
+        )
+    )
+    fig.show()
+
     
 
 def Scatter_3D(df,x_name,y_name,z_name,species_name = "",color_name = ""):
