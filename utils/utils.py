@@ -102,7 +102,7 @@ def AddTrackCoupleToDf(df,wifi_a,wifi_b,switch_t,switch_speed):
             get = True
             df.at[index,'count'] += 1
             df.at[index,'meanTime'] += switch_t
-            if(df.at[index,'maxSpeed']>switch_speed):
+            if(df.at[index,'maxSpeed'] < switch_speed):
                 df.at[index,'maxSpeed'] = switch_speed
             return df
     if get == False:
@@ -123,7 +123,7 @@ def GetFirstTrack(df):
 def GetDfNow(df,mac):
     return df[df.m == mac].sort_values(by='t').reset_index().drop('index',axis=1)
 
-def GetJumpWifiTrack(df_now,count_thre,time_thre,dis_thre):
+def GetJumpWifiTrack(df_now,count_thre,time_thre,dis_thre,speed_thre):
     #get track switch count
     last_track = 0
     df_count = pd.DataFrame({'wifi_a':[],'wifi_b':[],'count':[]})
@@ -134,7 +134,10 @@ def GetJumpWifiTrack(df_now,count_thre,time_thre,dis_thre):
             continue
         if last_track != row.a:
             t = df_now.iloc[index].t-df_now.iloc[index - 1].t 
-            df_count = AddTrackCoupleToDf(df_count,last_track,row.a,t)
+            dis = GetWifiTrackDistance(df_now.iloc[index].a,df_now.iloc[index-1].a,df_wifipos)
+            seconds = t.total_seconds() if t.total_seconds() > 0 else 0.5
+            speed = dis/seconds
+            df_count = AddTrackCoupleToDf(df_count,last_track,row.a,t,speed)
             last_track = row.a
     
     #get tracks that switch more than count_thre
@@ -145,12 +148,18 @@ def GetJumpWifiTrack(df_now,count_thre,time_thre,dis_thre):
     #meanTime less than time_thre
     df_count.meanTime = df_count.meanTime.apply(lambda x :x.total_seconds())
     df_count.meanTime = df_count.meanTime/df_count['count']
-    df_count = df_count[(df_count.meanTime < time_thre) | (df_count['count']>50)]
+    df_count = df_count[(df_count.meanTime < time_thre) | (df_count['count']>50) | (df_count.maxSpeed > speed_thre)]
     if len(df_count) == 0:
         return df_count
 
     #distance less than dis_thre
-    df_count = df_count[(df_count.distance < dis_thre) | (df_count['count']>50)]
+    df_count = df_count[(df_count.distance < dis_thre) | (df_count['count']>50) | (df_count.maxSpeed > speed_thre)]
+    if len(df_count) == 0:
+        return df_count
+    
+    #max speed > 4
+
+    df_count = df_count[df_count.maxSpeed > 4 | (df_count['count']>50)]
     if len(df_count) == 0:
         return df_count
     
@@ -171,17 +180,39 @@ def GetJumpTrackSets(track_list1,track_list2):
         b = int(track_list2[i])
         added = False
         for track_set in track_sets:
-            if a in track_set or b in track_set:
-                if len(track_set) == 3:
-                    if a in track_set and b in track_set:
+            # if a in track_set or b in track_set:
+            #     if len(track_set) == 3:
+            #         if a in track_set and b in track_set:
+            #             added = True
+            #         continue
+            #     track_set.add(a)
+            #     track_set.add(b)
+            #     added = True
+
+            #find if there are potential triangle set
+            if a in track_set and len(track_set) == 2:
+                c = _getTrackSetAnotherTrack(track_set,a)
+                for other_set in track_sets:
+                    if c in other_set and b in other_set:
+                        #find new triangle
+                        track_sets.remove(track_set)
+                        track_sets.remove(other_set)
+                        track_sets.append(set([a,b,c]))
                         added = True
-                    continue
-                track_set.add(a)
-                track_set.add(b)
-                added = True
+                        break
         if added == False:
             track_sets.append(set([a,b]))
     return track_sets
+
+def _getTrackSetAnotherTrack(track_set,a):
+    '''
+    return a *two value* track_set's another track
+    '''
+    if len(track_set) > 2:
+        return 0
+    l = list(track_set)
+    return l[0] if l[1] == a else l[1]
+
 
 def AddNewWifiTrack(df_wifiposNew,jumpTrack_sets):
     for track_set in jumpTrack_sets:
