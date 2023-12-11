@@ -102,7 +102,7 @@ def AddTrackCoupleToDf(df,wifi_a,wifi_b,switch_t,switch_speed):
             get = True
             df.at[index,'count'] += 1
             df.at[index,'meanTime'] += switch_t
-            if(df.at[index,'maxSpeed']>switch_speed):
+            if(df.at[index,'maxSpeed'] < switch_speed):
                 df.at[index,'maxSpeed'] = switch_speed
             return df
     if get == False:
@@ -123,7 +123,7 @@ def GetFirstTrack(df):
 def GetDfNow(df,mac):
     return df[df.m == mac].sort_values(by='t').reset_index().drop('index',axis=1)
 
-def GetJumpWifiTrack(df_now,count_thre,time_thre,dis_thre):
+def GetJumpWifiTrack(df_now,count_thre,time_thre,dis_thre,speed_thre):
     #get track switch count
     last_track = 0
     df_count = pd.DataFrame({'wifi_a':[],'wifi_b':[],'count':[]})
@@ -134,7 +134,10 @@ def GetJumpWifiTrack(df_now,count_thre,time_thre,dis_thre):
             continue
         if last_track != row.a:
             t = df_now.iloc[index].t-df_now.iloc[index - 1].t 
-            df_count = AddTrackCoupleToDf(df_count,last_track,row.a,t)
+            dis = GetWifiTrackDistance(df_now.iloc[index].a,df_now.iloc[index-1].a,df_wifipos)
+            seconds = t.total_seconds() if t.total_seconds() > 0 else 0.5
+            speed = dis/seconds
+            df_count = AddTrackCoupleToDf(df_count,last_track,row.a,t,speed)
             last_track = row.a
     
     #get tracks that switch more than count_thre
@@ -145,12 +148,17 @@ def GetJumpWifiTrack(df_now,count_thre,time_thre,dis_thre):
     #meanTime less than time_thre
     df_count.meanTime = df_count.meanTime.apply(lambda x :x.total_seconds())
     df_count.meanTime = df_count.meanTime/df_count['count']
-    df_count = df_count[(df_count.meanTime < time_thre) | (df_count['count']>50)]
+    df_count = df_count[(df_count.meanTime < time_thre) | (df_count['count']>50) | (df_count.maxSpeed > speed_thre)]
     if len(df_count) == 0:
         return df_count
 
     #distance less than dis_thre
-    df_count = df_count[(df_count.distance < dis_thre) | (df_count['count']>50)]
+    df_count = df_count[(df_count.distance < dis_thre) | (df_count['count']>50) | (df_count.maxSpeed > speed_thre)]
+    if len(df_count) == 0:
+        return df_count
+    
+    #max speed > 4
+    df_count = df_count[df_count.maxSpeed > 4]
     if len(df_count) == 0:
         return df_count
     
