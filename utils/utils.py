@@ -87,28 +87,32 @@ def _getDistance(track1_pos,track2_pos):
     return math.sqrt(x*x + y*y)
 
 
-def AddTrackCoupleToDf(df,wifi_a,wifi_b,switch_t,switch_speed):
-    '''
-    Add new couple if not exist, increace count if exist, also record couple's distance
-    '''
-    wifi_a = int(wifi_a)
-    wifi_b = int(wifi_b)
-    
-    #df = pd.DataFrame({'wifi_a':[],'wifi_b':[],'count':[],'distance':[]})
-    get = False
-    
-    for index,row in df.iterrows():
-        if (row['wifi_a'] == wifi_a and row['wifi_b'] == wifi_b) or (row['wifi_a'] == wifi_b and row['wifi_b'] == wifi_a):
-            get = True
-            df.at[index,'count'] += 1
-            df.at[index,'meanTime'] += switch_t
-            if(df.at[index,'maxSpeed'] < switch_speed):
-                df.at[index,'maxSpeed'] = switch_speed
-            return df
-    if get == False:
-        dis = GetWifiTrackDistance(wifi_a,wifi_b,df_wifipos)
-        df = df._append({'wifi_a':wifi_a,'wifi_b':wifi_b,'count':1,'distance':dis,'meanTime':switch_t,'maxSpeed':switch_speed},ignore_index = True)
-    return df
+
+
+def GetRepeatTrack(df_now):
+    del_list = []
+    track_now = df_now.iloc[0].a
+    ind_list = []
+    end_mark = df_now.iloc[len(df_now)-1].mark
+    for index,row in df_now.iterrows():
+        
+        if row.a == track_now:
+            if row.mark == end_mark:
+                if len(ind_list)>2:
+                    del_list.extend(ind_list[0:len(ind_list)-1])
+            else:
+                ind_list.append(row.mark)
+        else:
+            track_now = row.a
+            if len(ind_list)>1:
+                del_list.extend(ind_list[0:len(ind_list)-1])
+            ind_list = []
+    return del_list
+
+def DeleteRepeatTrack(df_now):
+    del_list = set(GetRepeatTrack(df_now))
+    df_now = df_now[df_now.mark.apply(lambda x : x not in del_list)]
+    return df_now.reset_index().drop('index',axis=1)
 
 def GetFirstTrack(df):
     del_list = []
@@ -123,130 +127,23 @@ def GetFirstTrack(df):
 def GetDfNow(df,mac):
     return df[df.m == mac].sort_values(by='t').reset_index().drop('index',axis=1)
 
-def GetJumpWifiTrack(df_now,count_thre,time_thre,dis_thre,speed_thre):
-    #get track switch count
-    last_track = 0
-    df_count = pd.DataFrame({'wifi_a':[],'wifi_b':[],'count':[]})
+def GetDfNowElimRepeat(df,mac):
+    df_now = GetDfNow(df,mac)
+    return DeleteRepeatTrack(df_now)
 
-    for index,row in df_now.iterrows():
-        if last_track == 0:
-            last_track = row.a
-            continue
-        if last_track != row.a:
-            t = df_now.iloc[index].t-df_now.iloc[index - 1].t 
-            dis = GetWifiTrackDistance(df_now.iloc[index].a,df_now.iloc[index-1].a,df_wifipos)
-            seconds = t.total_seconds() if t.total_seconds() > 0 else 0.5
-            speed = dis/seconds
-            df_count = AddTrackCoupleToDf(df_count,last_track,row.a,t,speed)
-            last_track = row.a
-    
-    #get tracks that switch more than count_thre
-    df_count = df_count[df_count['count']>count_thre]
-    if len(df_count) == 0:
-        return df_count
-
-    #meanTime less than time_thre
-    df_count.meanTime = df_count.meanTime.apply(lambda x :x.total_seconds())
-    df_count.meanTime = df_count.meanTime/df_count['count']
-    df_count = df_count[(df_count.meanTime < time_thre) | (df_count['count']>50) | (df_count.maxSpeed > speed_thre)]
-    if len(df_count) == 0:
-        return df_count
-
-    #distance less than dis_thre
-    df_count = df_count[(df_count.distance < dis_thre) | (df_count['count']>50) | (df_count.maxSpeed > speed_thre)]
-    if len(df_count) == 0:
-        return df_count
-    
-    #max speed > 4
-
-    df_count = df_count[df_count.maxSpeed > 4 | (df_count['count']>50)]
-    if len(df_count) == 0:
-        return df_count
-    
-    df_count = df_count.sort_values(by='count',ascending=False)
-    return df_count
-
-def GetJumpTrackSets(track_list1,track_list2):
-    '''
-    get pair of track lists and return jump track sets.
-    length of list1 and list2 must equal.
-    a set length is with max length of 3.
-    '''
-    if len(track_list1) != len(track_list2):
-        return
-    track_sets = []
-    for i in range(len(track_list1)):
-        a = int(track_list1[i])
-        b = int(track_list2[i])
-        added = False
-        for track_set in track_sets:
-            # if a in track_set or b in track_set:
-            #     if len(track_set) == 3:
-            #         if a in track_set and b in track_set:
-            #             added = True
-            #         continue
-            #     track_set.add(a)
-            #     track_set.add(b)
-            #     added = True
-
-            #find if there are potential triangle set
-            if a in track_set and len(track_set) == 2:
-                c = _getTrackSetAnotherTrack(track_set,a)
-                for other_set in track_sets:
-                    if c in other_set and b in other_set:
-                        #find new triangle
-                        track_sets.remove(track_set)
-                        track_sets.remove(other_set)
-                        track_sets.append(set([a,b,c]))
-                        added = True
-                        break
-        if added == False:
-            track_sets.append(set([a,b]))
-    return track_sets
-
-def _getTrackSetAnotherTrack(track_set,a):
-    '''
-    return a *two value* track_set's another track
-    '''
-    if len(track_set) > 2:
-        return 0
-    l = list(track_set)
-    return l[0] if l[1] == a else l[1]
-
-
-def AddNewWifiTrack(df_wifiposNew,jumpTrack_sets):
-    for track_set in jumpTrack_sets:
-        #check if existed already
-        info = ':'.join(map(str,track_set))
-        if info in df_wifiposNew.parents.values:
-            continue
-        
-        #add new track
-        newTrack = int(round(random.random(),5)*100000)
-        xx = 0
-        yy = 0
-        for track in track_set:
-            xx += df_wifiposNew[df_wifiposNew.wifi == track].iloc[0].X
-            yy += df_wifiposNew[df_wifiposNew.wifi == track].iloc[0].Y
-        
-        xx = int(xx/len(track_set))
-        yy = int(yy/len(track_set))
-        df_wifiposNew = df_wifiposNew._append({'wifi':newTrack,'X':xx,'Y':yy,'parents':info},ignore_index=True)
-    return df_wifiposNew
-
-def Show3DTrack_Origin(df_track,df_wifiPos):
-    z = []
-    x = []
-    y = []
-    for index,row in df_track.iterrows():
-        z.append(row.t.hour+(row.t.minute/60))
-        x.append(df_wifiPos[df_wifiPos.wifi == row.a].iloc[0].X)
-        y.append(df_wifiPos[df_wifiPos.wifi == row.a].iloc[0].Y)
-    myplot.Track_3D(x,y,z)
 
 def PushValue(list,value,max_len):
     list.append(value)
     if(len(list)>max_len):
         list.pop(0)
+
+def GetVirtualTrack(df_wifiPos_restored,activeSet):
+    df_virtual = df_wifiPos_restored[df_wifiPos_restored.ID == "virtual"]
+    
+    for i,row in df_virtual.iterrows():
+        set_now = set(map(int,row.parents.split(":")))
+        if activeSet.issubset(set_now):
+            return row.wifi
+    return -1
 
 
