@@ -91,19 +91,19 @@ def Double_Axes_Line(df,xAxis_str,line1_str,line2_str,xAxes_name = "",line1_name
         fig.update_xaxes
     fig.show()
 
-def Scatter_2D(df,x_name,y_name,label_name = '',bg_img_path = ''):
+def Scatter_2D(df,x_name,y_name,label_name = '',bg_img = ''):
     fig = go.Figure()
     if label_name == '':
         fig = px.scatter(x=df[x_name], y=df[y_name])
     else:
         fig = px.scatter(x=df[x_name], y=df[y_name],color=df[label_name])
    
-    if bg_img_path != '':
+    if bg_img != '':
         # Add images
-        img = Image.open(bg_img_path)
+        
         fig.add_layout_image(
                 dict(
-                    source=img,
+                    source=bg_img,
                     xref="x", yref="y",
                     x=0, y=0,  #position of the upper left corner of the image in subplot 1,1
                     sizex= 400,sizey= 300, #sizex, sizey are set by trial and error
@@ -192,7 +192,7 @@ def Scatter_2D_Subplot(data_tuple_list,bg_img_path = ""):
 
     fig.show()
 
-def Parents_2D(df,bg_img_path = ''):
+def Parents_2D(df,bg_img = ''):
     df_virtual = df[df.ID == "virtual"]
     parents_sets = []
     for i in range(len(df_virtual)):
@@ -210,12 +210,12 @@ def Parents_2D(df,bg_img_path = ''):
     for set in parents_sets:
         fig.add_trace(go.Scatter(x=set[0], y=set[1],
                             line=dict(width=1)))
-    if bg_img_path != '':
+    if bg_img != '':
         # Add images
-        img = Image.open(bg_img_path)
+        
         fig.add_layout_image(
                 dict(
-                    source=img,
+                    source=bg_img,
                     xref="x", yref="y",
                     x=0, y=0,  #position of the upper left corner of the image in subplot 1,1
                     sizex= 400,sizey= 300, #sizex, sizey are set by trial and error
@@ -385,9 +385,14 @@ def Track_3D(x,y,z,x_name = "",y_name = "",z_name = ""):
                     z=1,
                 )
             ),
-            aspectratio = dict( x=1, y=1, z=0.7 ),
-            aspectmode = 'manual'
+            
+            aspectmode = 'manual',
+            aspectratio=dict(x=1, y=0.75, z=0.75),
+            xaxis = dict(nticks=4, range=[0,400],),
+            yaxis = dict(nticks=4, range=[0,300],),
+            zaxis = dict(nticks=4, range=[0,24],),
         ),
     )
+    
 
     fig.show()
