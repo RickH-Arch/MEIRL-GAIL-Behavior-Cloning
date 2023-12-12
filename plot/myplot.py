@@ -396,3 +396,23 @@ def Track_3D(x,y,z,x_name = "",y_name = "",z_name = ""):
     
 
     fig.show()
+
+def Track3D_Origin(df_now,df_wifiPos):
+    z = []
+    x = []
+    y = []
+    for index,row in df_now.iterrows():
+        z.append(row.t.hour+(row.t.minute/60))
+        x.append(df_wifiPos[df_wifiPos.wifi == row.a].iloc[0].X)
+        y.append(df_wifiPos[df_wifiPos.wifi == row.a].iloc[0].Y)
+    Track_3D(x,y,z)
+
+def Track3D_Virtual(df_now,df_wifiPos):
+    z = []
+    x = []
+    y = []
+    for index,row in df_now.iterrows():
+        z.append(row.t.hour+(row.t.minute/60))
+        x.append(df_wifiPos[df_wifiPos.wifi == row.a].iloc[0].restored_x)
+        y.append(df_wifiPos[df_wifiPos.wifi == row.a].iloc[0].restored_y)
+    Track_3D(x,y,z)
