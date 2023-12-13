@@ -192,8 +192,11 @@ def Scatter_2D_Subplot(data_tuple_list,bg_img_path = ""):
 
     fig.show()
 
-def Parents_2D(df,bg_img = ''):
-    df_virtual = df[df.ID.apply(lambda x : x.__contains__("virtual"))]
+def Parents_2D(df,bg_img = '',ID = "virtual"):
+    if ID == "virtual":
+        df_virtual = df[df.ID.apply(lambda x : x.__contains__("virtual"))]
+    else:
+        df_virtual = df[df.ID == ID]
     parents_sets = []
     for i in range(len(df_virtual)):
         track_list_now = df_virtual.iloc[i]['parents'].split(':')
@@ -238,9 +241,10 @@ def Parents_2D(df,bg_img = ''):
         t=10,
         pad=4
         ),
-        #yaxis_range=[0,320],
-        #xaxis_range=[0,420],
+        yaxis_range=[0,300],
+        xaxis_range=[0,400],
         template="plotly_white",
+        
 
         legend = dict(
             title = ''
@@ -333,26 +337,37 @@ def Boxes(list_tuple,box_title = ""):
     args:
     list_tuple[0][0]:y轴数据_list, list_tuple[0][1]:数据名称
     '''
-    fig = go.Figure()
-    for t in list_tuple:
-        fig.add_trace(go.Box(
-            y = t[0],
-            name = t[1],
-            jitter=0.3,
-            pointpos=-1.8,
-            boxpoints='all', # represent all points
-            marker_color='rgb(7,40,89)',
-            line_color='rgb(7,40,89)'
-        ))
+    fig = make_subplots(rows=1, cols=len(list_tuple))
+    for i,tuple in enumerate(list_tuple):
+        fig.add_trace(
+            go.Box(y=tuple[0],
+                name=tuple[1],
+                marker_size=1,
+                line_width=1),
+        row=1, col=i+1
+    )
+    fig.update_traces(boxpoints='all', jitter=.2)
+    # fig = go.Figure()
+    # for t in list_tuple:
+    #     fig.add_trace(go.Box(
+    #         y = t[0],
+    #         name = t[1],
+    #         jitter=0.3,
+    #         pointpos=-1.8,
+    #         boxpoints='all', # represent all points
+    #         marker_color='rgb(7,40,89)',
+    #         line_color='rgb(7,40,89)'
+    #     ))
     if box_title == "":
         fig.update_layout(title_text="Box Plot")
     else :
         fig.update_layout(title_text=box_title)
-    fig.update_layout(
-        width = 400*len(list_tuple),
-        height = 500
-    )
+    # fig.update_layout(
+    #     width = 400*len(list_tuple),
+    #     height = 500
+    # )
     fig.show()
+
 
 def Track_3D(x,y,z,x_name = "",y_name = "",z_name = ""):
     
