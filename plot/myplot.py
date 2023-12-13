@@ -193,7 +193,7 @@ def Scatter_2D_Subplot(data_tuple_list,bg_img_path = ""):
     fig.show()
 
 def Parents_2D(df,bg_img = ''):
-    df_virtual = df[df.ID == "virtual"]
+    df_virtual = df[df.ID.apply(lambda x : x.__contains__("virtual"))]
     parents_sets = []
     for i in range(len(df_virtual)):
         track_list_now = df_virtual.iloc[i]['parents'].split(':')
