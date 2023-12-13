@@ -114,6 +114,34 @@ def DeleteRepeatTrack(df_now):
     df_now = df_now[df_now.mark.apply(lambda x : x not in del_list)]
     return df_now.reset_index().drop('index',axis=1)
 
+def DeleteRepeateTrackByLocation(df_now,df_wifipos):
+    '''
+    delete repeate tracks according restored location
+    '''
+    last_loc = [0,0]
+    del_marks = []
+    del_marks_Now = []
+    end_index = len(df_now)-1
+    for index,row in df_now.iterrows():
+        tracker = row.a
+        row_loc = df_wifipos[df_wifipos.wifi == tracker].iloc[0]
+        loc = [row_loc.restored_x,row_loc.restored_y]
+        if index == 0:
+            last_loc = loc
+        elif index == end_index:
+            if(len(del_marks_Now))>1:
+                    del_marks.extend(del_marks_Now)
+        else:
+            if _getDistance(loc,last_loc)<1:
+                del_marks_Now.append(row.mark)
+            else:
+                if(len(del_marks_Now))>1:
+                    del_marks.extend(del_marks_Now[0:len(del_marks_Now)-1])
+                del_marks_Now = []
+                last_loc = loc
+    del_marks = set(del_marks)
+    return df_now[df_now.mark.apply(lambda x : x not in del_marks)].reset_index().drop('index',axis=1)
+
 def GetFirstTrack(df):
     del_list = []
     a_now = 0
@@ -138,7 +166,7 @@ def PushValue(list,value,max_len):
         list.pop(0)
 
 def GetVirtualTrack(df_wifiPos_restored,activeSet):
-    df_virtual = df_wifiPos_restored[df_wifiPos_restored.ID == "virtual"]
+    df_virtual = df_wifiPos_restored[df_wifiPos_restored.ID.apply(lambda x : x.__contains__("virtual"))]
     
     for i,row in df_virtual.iterrows():
         set_now = set(map(int,row.parents.split(":")))

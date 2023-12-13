@@ -7,10 +7,20 @@ import utils
 from tqdm import tqdm
 
 
-def JumpTrackRestore(df_now,df_wifipos):
+def JumpTrackRestore(df_now,
+                     df_wifipos,
+                     count_thre,
+                     time_thre,
+                     dis_thre, 
+                     speed_thre):
 
-    df_count = utils.GetJumpWifiTrack(df_now)
-    track_sets = utils.GetJumpTrackSets(df_count.wifi_a.values,df_count.wifi_b.values)
+    df_count = GetJumpWifiTrackCouple(df_now,
+                                      df_wifipos,
+                                      count_thre,
+                                        time_thre,
+                                        dis_thre, 
+                                        speed_thre)
+    track_sets = GetJumpTrackSets(df_count.wifi_a.values,df_count.wifi_b.values)
 
 
     _STATUS_ = [False]*len(track_sets)#记录该mac下每个跳动探针组的激活状态
