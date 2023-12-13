@@ -4,6 +4,11 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
 from PIL import Image
+import os
+img_path = os.getcwd()+'/../wifi_track_data/dacang/imgs/roads.png'
+img = Image.open(img_path)
+background_img = img
+buttom_img = Image.fromarray(np.array(img.transpose(Image.FLIP_TOP_BOTTOM))).convert('P', palette='WEB', dither=None)
 
 colors = ['rgb(67,67,67)', 'rgb(115,115,115)']
 line_size = [2,2,2,2]
@@ -91,28 +96,29 @@ def Double_Axes_Line(df,xAxis_str,line1_str,line2_str,xAxes_name = "",line1_name
         fig.update_xaxes
     fig.show()
 
-def Scatter_2D(df,x_name,y_name,label_name = '',bg_img = ''):
+def Scatter_2D(df,x_name,y_name,label_name = '',bg_img = 0):
     fig = go.Figure()
     if label_name == '':
         fig = px.scatter(x=df[x_name], y=df[y_name])
     else:
         fig = px.scatter(x=df[x_name], y=df[y_name],color=df[label_name])
-   
-    if bg_img != '':
-        # Add images
+    
+    if bg_img == 0:
+        bg_img = background_img
         
-        fig.add_layout_image(
-                dict(
-                    source=bg_img,
-                    xref="x", yref="y",
-                    x=0, y=0,  #position of the upper left corner of the image in subplot 1,1
-                    sizex= 400,sizey= 300, #sizex, sizey are set by trial and error
-                    xanchor="left",
-                    yanchor="bottom",
-                    sizing="stretch",
-                    layer="below",
-                    opacity=0.3)
-        )
+    fig.add_layout_image(
+            dict(
+                source=bg_img,
+                xref="x", yref="y",
+                x=0, y=0,  #position of the upper left corner of the image in subplot 1,1
+                sizex= 400,sizey= 300, #sizex, sizey are set by trial and error
+                xanchor="left",
+                yanchor="bottom",
+                sizing="stretch",
+                layer="below",
+                opacity=0.3)
+    )
+
     fig.update_layout(
         width=480,
         height=300,
@@ -192,7 +198,7 @@ def Scatter_2D_Subplot(data_tuple_list,bg_img_path = ""):
 
     fig.show()
 
-def Parents_2D(df,bg_img = '',ID = "virtual"):
+def Parents_2D(df,ID = "virtual"):
     if ID == "virtual":
         df_virtual = df[df.ID.apply(lambda x : x.__contains__("virtual"))]
     else:
@@ -213,21 +219,19 @@ def Parents_2D(df,bg_img = '',ID = "virtual"):
     for set in parents_sets:
         fig.add_trace(go.Scatter(x=set[0], y=set[1],
                             line=dict(width=1)))
-    if bg_img != '':
-        # Add images
-        
-        fig.add_layout_image(
-                dict(
-                    source=bg_img,
-                    xref="x", yref="y",
-                    x=0, y=0,  #position of the upper left corner of the image in subplot 1,1
-                    sizex= 400,sizey= 300, #sizex, sizey are set by trial and error
-                    xanchor="left",
-                    yanchor="bottom",
-                    sizing="stretch",
-                    layer="below",
-                    opacity=0.3)
-        )
+    
+    fig.add_layout_image(
+            dict(
+                source=background_img,
+                xref="x", yref="y",
+                x=0, y=0,  #position of the upper left corner of the image in subplot 1,1
+                sizex= 400,sizey= 300, #sizex, sizey are set by trial and error
+                xanchor="left",
+                yanchor="bottom",
+                sizing="stretch",
+                layer="below",
+                opacity=0.3)
+    )
 
     fig.update_layout(
         width=500,
@@ -347,42 +351,56 @@ def Boxes(list_tuple,box_title = ""):
         row=1, col=i+1
     )
     fig.update_traces(boxpoints='all', jitter=.2)
-    # fig = go.Figure()
-    # for t in list_tuple:
-    #     fig.add_trace(go.Box(
-    #         y = t[0],
-    #         name = t[1],
-    #         jitter=0.3,
-    #         pointpos=-1.8,
-    #         boxpoints='all', # represent all points
-    #         marker_color='rgb(7,40,89)',
-    #         line_color='rgb(7,40,89)'
-    #     ))
+    
     if box_title == "":
         fig.update_layout(title_text="Box Plot")
     else :
         fig.update_layout(title_text=box_title)
-    # fig.update_layout(
-    #     width = 400*len(list_tuple),
-    #     height = 500
-    # )
+    
     fig.show()
 
 
 def Track_3D(x,y,z,x_name = "",y_name = "",z_name = ""):
+    dum_img = Image.fromarray(np.ones((3,3,3), dtype='uint8')).convert('P', palette='WEB')
+    idx_to_color = np.array(dum_img.getpalette()).reshape((-1, 3))
+    colorscale=[[i/255.0, "rgb({}, {}, {})".format(*rgb)] for i, rgb in enumerate(idx_to_color)]
     
-    fig = go.Figure(data=go.Scatter3d(
-        x=x, y=y, z=z,
-        marker=dict(
-            size=4,
-            color=z,
-            colorscale='Viridis',
-        ),
-        line=dict(
-            color='darkblue',
-            width=2
-        )
+    fig = go.Figure()
+    fig.add_trace(go.Scatter3d(
+    x=x, 
+    y=y, 
+    z=z,
+    
+    marker=dict(
+        color=z,
+        colorscale='Viridis',
+        size=3,
+    ),
+    line=dict(
+        color='rgba(50,50,50,0.6)',
+        width=3,
+        
+    )
     ))
+
+    im_x = np.linspace(0, 400, 400)
+    im_y = np.linspace(0, 300, 300)
+    im_z = np.zeros((300,400))
+
+    #add buttom background image
+    fig.add_trace(go.Surface(x=im_x, y=im_y, z=im_z,
+        surfacecolor=buttom_img, 
+        cmin=0, 
+        cmax=255,
+        colorscale=colorscale,
+        showscale=False,
+        lighting_diffuse=1,
+        lighting_ambient=1,
+        lighting_fresnel=1,
+        lighting_roughness=1,
+        lighting_specular=0.5,
+    ))
+
     fig.update_layout(
         width=500,
         height=500,
@@ -396,11 +414,16 @@ def Track_3D(x,y,z,x_name = "",y_name = "",z_name = ""):
                 ),
                 eye=dict(
                     x=0,
-                    y=1.0707,
+                    y=-1,
                     z=1,
                 )
             ),
-            
+            xaxis_visible=True,
+                yaxis_visible=True, 
+                zaxis_visible=True, 
+                xaxis_title="X",
+                yaxis_title="Y",
+                zaxis_title="Z" ,
             aspectmode = 'manual',
             aspectratio=dict(x=1, y=0.75, z=0.75),
             xaxis = dict(nticks=4, range=[0,400],),
@@ -408,6 +431,7 @@ def Track_3D(x,y,z,x_name = "",y_name = "",z_name = ""):
             zaxis = dict(nticks=4, range=[0,24],),
         ),
     )
+    
     
 
     fig.show()
