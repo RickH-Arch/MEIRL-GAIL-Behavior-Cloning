@@ -74,11 +74,17 @@ def ShowClusterResult(df,col_name_list,cut_thre = 0,cut_col_name = "",cut_mode =
         _add_data(df_result,name,data_list)
     myplot.Surface3D_supPlot(data_list)
 
-def GetWifiTrackDistance(wifi_a,wifi_b,df_pos):
+def GetWifiTrackDistance(wifi_a,wifi_b,df_pos,restore = False):
     pp1 = df_pos[df_pos.wifi == wifi_a].iloc[0]
     pp2 = df_pos[df_pos.wifi == wifi_b].iloc[0]
-    pos1 = [pp1.X,pp1.Y]
-    pos2 = [pp2.X,pp2.Y]
+    if not restore:
+        pos1 = [pp1.X,pp1.Y]
+        pos2 = [pp2.X,pp2.Y]
+    else:
+        pos1 = [pp1.restored_x,pp1.restored_y]
+        pos2 = [pp2.restored_x,pp2.restored_y]
+    
+    
     return round(_getDistance(pos1,pos2),2)
 
 def _getDistance(track1_pos,track2_pos):
