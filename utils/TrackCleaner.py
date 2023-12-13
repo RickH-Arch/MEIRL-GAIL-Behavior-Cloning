@@ -1,15 +1,12 @@
 import numpy as np
-import sys
-sys.path.append('../plot/')
-import myplot
-from collections import namedtuple
 import pandas as pd
 import random
 import math
 import os
 import utils
+from tqdm import tqdm
 
-df_wifipos = pd.read_csv(os.getcwd()+'/../wifi_track_data/dacang/wifi_track_pos&traj/wifi_pos.csv')
+
 def JumpTrackRestore(df_now,df_wifipos):
 
     df_count = utils.GetJumpWifiTrack(df_now)
@@ -77,7 +74,7 @@ def JumpTrackRestore(df_now,df_wifipos):
 
     return utils.DeleteRepeatTrack(df_now)
 
-def AddTrackCoupleToDf(df,wifi_a,wifi_b,switch_t,switch_speed):
+def AddTrackCoupleToDf(df,df_wifipos,wifi_a,wifi_b,switch_t,switch_speed):
     '''
     Add new couple if not exist, increace count if exist, also record couple's distance
     '''
@@ -100,7 +97,7 @@ def AddTrackCoupleToDf(df,wifi_a,wifi_b,switch_t,switch_speed):
         df = df._append({'wifi_a':wifi_a,'wifi_b':wifi_b,'count':1,'distance':dis,'meanTime':switch_t,'maxSpeed':switch_speed},ignore_index = True)
     return df
 
-def GetJumpWifiTrackCouple(df_now,count_thre = 13,time_thre = 300,dis_thre = 89,speed_thre = 26):
+def GetJumpWifiTrackCouple(df_now,df_wifipos,count_thre = 13,time_thre = 300,dis_thre = 89,speed_thre = 26):
     #get track switch count
     last_track = 0
     df_count = pd.DataFrame({'wifi_a':[],'wifi_b':[],'count':[]})
@@ -114,7 +111,7 @@ def GetJumpWifiTrackCouple(df_now,count_thre = 13,time_thre = 300,dis_thre = 89,
             dis = utils.GetWifiTrackDistance(df_now.iloc[index].a,df_now.iloc[index-1].a,df_wifipos)
             seconds = t.total_seconds() if t.total_seconds() > 0 else 0.5
             speed = dis/seconds
-            df_count = AddTrackCoupleToDf(df_count,last_track,row.a,t,speed)
+            df_count = AddTrackCoupleToDf(df_count,df_wifipos,last_track,row.a,t,speed)
             last_track = row.a
     
     #get tracks that switch more than count_thre
@@ -190,7 +187,7 @@ def _getTrackSetAnotherTrack(track_set,a):
     l = list(track_set)
     return l[0] if l[1] == a else l[1]
 
-def AddNewWifiTrack(df_wifiposNew,jumpTrack_sets):
+def AddNewWifiTrack(df_wifiposNew,jumpTrack_sets,label):
     for track_set in jumpTrack_sets:
         #check if existed already
         info = ':'.join(map(str,track_set))
@@ -207,5 +204,61 @@ def AddNewWifiTrack(df_wifiposNew,jumpTrack_sets):
         
         xx = int(xx/len(track_set))
         yy = int(yy/len(track_set))
-        df_wifiposNew = df_wifiposNew._append({'wifi':newTrack,'X':xx,'Y':yy,'parents':info},ignore_index=True)
+        df_wifiposNew = df_wifiposNew._append({'wifi':newTrack,'X':xx,'Y':yy,'parents':info,'ID':label},ignore_index=True)
+    return df_wifiposNew
+
+def InsightTrack(df,df_pos):
+    df_insight = pd.DataFrame({'wifi_a':[],'wifi_b':[],'count':[],'distance':[],'meanTime':[],'maxSpeed':[]})
+    mac_list = df.m.unique()
+    for mac in tqdm(mac_list):
+        df_now = utils.GetDfNow(df,mac)
+        
+        last_track = 0
+        #df_once = GetFirstTrack(df_now)
+        df_count_now = pd.DataFrame({'wifi_a':[],'wifi_b':[],'count':[],'distance':[],'meanTime':[],'maxSpeed':[]})
+
+        #get all switch info to df_count
+        for index,row in df_now.iterrows():
+            if last_track == 0:
+                last_track = row.a
+                continue
+            if last_track !=row.a:
+                t = df_now.iloc[index].t-df_now.iloc[index - 1].t 
+                dis = utils.GetWifiTrackDistance(df_now.iloc[index].a,df_now.iloc[index-1].a,df_pos)
+                seconds = t.total_seconds() if t.total_seconds() > 0 else 0.5
+                speed = dis/seconds
+                df_count_now = AddTrackCoupleToDf(df_count_now,df_pos,last_track,row.a,t,speed)
+                last_track = row.a
+
+        #concat df_count
+        df_insight = pd.concat([df_insight,df_count_now],axis=0)
+
+    df_insight.meanTime = df_insight.meanTime.apply(lambda x :x.total_seconds())
+    df_insight.meanTime = df_insight.meanTime/df_insight['count']
+    return df_insight
+
+def GenerateVirtualTracker(df,df_wifipos,count_thre = 13,time_thre = 300,dis_thre = 89, speed_thre = 26,label = 'virtual'):
+    df_wifiposNew = df_wifipos.copy()
+    mac_list = df.m.unique()
+    for mac in tqdm(mac_list):
+    #for i in range(1):
+        #get df now
+        df_now = utils.GetDfNow(df,mac)
+        
+        df_couple = GetJumpWifiTrackCouple(df_now,df_wifiposNew,count_thre,time_thre,dis_thre,speed_thre)
+        if len(df_couple) == 0:
+            continue
+        
+        #get jump track sets
+        track_sets = GetJumpTrackSets(df_couple.wifi_a.values,df_couple.wifi_b.values)
+        #add new virtual tracks
+        df_wifiposNew = AddNewWifiTrack(df_wifiposNew,track_sets,label)
+
+    df_wifiposNew['restored_x'] = [-1]*len(df_wifiposNew)
+    df_wifiposNew['restored_y'] = [-1]*len(df_wifiposNew)
+    for i,row in df_wifiposNew.iterrows():
+        if row.ID == 'real':
+            df_wifiposNew.at[i,'restored_x'] = row.X
+            df_wifiposNew.at[i,'restored_y'] = row.Y
+
     return df_wifiposNew
