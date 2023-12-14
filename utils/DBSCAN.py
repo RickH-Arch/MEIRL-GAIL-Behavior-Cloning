@@ -3,7 +3,7 @@ from sklearn.metrics import silhouette_score # 轮廓系数评估函数
 from sklearn.metrics import calinski_harabasz_score #卡林斯基-哈拉巴斯指数
 from collections import namedtuple
 import numpy as np
-from DBCV import DBCV
+from utils.DBCV import DBCV
 from tqdm import tqdm
 
 DBSCAN_RESULT = namedtuple('dbscan_result',
