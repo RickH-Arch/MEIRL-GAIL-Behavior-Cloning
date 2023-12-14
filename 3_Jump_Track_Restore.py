@@ -2,17 +2,12 @@ import pandas as pd
 import numpy as np
 import os
 from tqdm import tqdm
-import math
 
 from utils import utils,TrackCleaner
 from utils.BoxFeatures import BoxFeature
 
-
 import warnings
 warnings.filterwarnings('ignore')
-
-from collections import namedtuple
-from importlib import reload
 
 from datetime import datetime
 current_date = datetime.now()
@@ -27,7 +22,7 @@ df_poten = pd.read_csv('wifi_track_data/dacang/pos_data/potential_wifi_pos.csv')
 df = pd.read_csv(track_data_path)
 df.t = pd.to_datetime(df.t)
 df_wifipos = pd.read_csv(wifipos_path)
-epoch = 123
+epoch = 1
 
 
 def TrackRestore(df,df_wifipos,count_thre=0,time_thre=0,distance_thre=0,speed_thre=0):
@@ -154,5 +149,28 @@ def TrackRestore(df,df_wifipos,count_thre=0,time_thre=0,distance_thre=0,speed_th
 
     return newTracker_count,df_new,df_wifipos
 
+newTracker_count = 1
+while newTracker_count>0:
+    newTracker_count,df_new,df_wifiposNew = TrackRestore(df,df_wifipos)
+    if newTracker_count>0:
+        df = df_new
+        df_wifipos = df_wifiposNew
+        epoch+=1
 
-TrackRestore(df,df_wifipos)
+#---------清除漂移轨迹------------
+
+df_new = pd.DataFrame(columns=df.columns)
+mac_list = df.m.unique()
+for mac in mac_list:
+    df_now = utils.GetDfNow(mac)
+    df_now = utils.DeleteDriftingTrack(df_now)
+    df_new = pd.concat([df_new,df_now],axis=0)
+df = df_new
+
+#---------清除一直在同一地方的mac----------
+
+list_count = df.groupby(['m']).a.value_counts()
+dd = list_count.to_frame().rename(columns={'a':'A'}).reset_index()
+mac_Once = dd[~dd.duplicated('m', keep=False)].m.reset_index().drop('index',axis=1)
+df = df.loc[~df.m.isin(mac_Once.m)]
+df.to_csv(os.getcwd()+f"/dacang/track_data/dacang_track_data_3_final_{date}.csv",index=False)

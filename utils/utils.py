@@ -179,4 +179,41 @@ def GetVirtualTrack(df_wifiPos_restored,activeSet):
             return row.wifi
     return -1
 
+def DeleteDriftingTrack(df_now):
+    del_marks = GetDriftingTrackMarks(df_now)
+    df_now = df_now[df_now.mark.apply(lambda x : x not in del_marks)].reset_index(drop = True)
+    return DeleteRepeatTrack(df_now)
+
+def GetDriftingTrackMarks(df_now):
+    '''
+    来回时间小于20s被认为是漂移轨迹
+    '''
+    m1 = -1
+    m2 = -1
+    t1 = 0
+    t2 = 0
+    del_marks = set([])
+    for i,row in df_now.iterrows():
+        if m1 == -1:
+            m1 = row.a
+        elif m2 == -1:
+            m2 = row.a
+            if row.a != m1:
+                t1 = row.t - df_now.iloc[i-1].t
+        else:
+            if row.a == m1:
+                t2 = row.t - df_now.iloc[i-1].t
+                if (t1+t2).total_seconds()<20:
+                    del_marks.add(df_now.iloc[i-1].mark)
+                    m1 = -1
+                    m2 = -1
+                else:
+                    m1 = m2
+                    m2 = row.a
+                    t1 = t2
+            else:
+                m1 = m2
+                m2 = row.a
+                t1 = t1 = row.t - df_now.iloc[i-1].t
+    return del_marks
 
