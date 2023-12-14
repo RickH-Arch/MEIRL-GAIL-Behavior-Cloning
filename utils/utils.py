@@ -1,14 +1,13 @@
 import numpy as np
 import sys
-sys.path.append('../plot/')
-import myplot
+from utils import myplot
 from collections import namedtuple
 import pandas as pd
 import random
 import math
 import os
 
-df_wifipos = pd.read_csv(os.getcwd()+'/../wifi_track_data/dacang/wifi_track_pos&traj/wifi_pos.csv')
+
 
 def Normalize_arr(arr):
     min_val = np.min(arr)

@@ -3,7 +3,7 @@ import pandas as pd
 import random
 import math
 import os
-import utils
+from utils import utils
 from tqdm import tqdm
 
 
@@ -220,7 +220,7 @@ def AddNewWifiTrack(df_wifiposNew,jumpTrack_sets,label):
 def InsightTrack(df,df_pos):
     df_insight = pd.DataFrame({'wifi_a':[],'wifi_b':[],'count':[],'distance':[],'meanTime':[],'maxSpeed':[]})
     mac_list = df.m.unique()
-    for mac in tqdm(mac_list):
+    for mac in tqdm(mac_list,desc="评估数据"):
         df_now = utils.GetDfNow(df,mac)
         
         last_track = 0
@@ -250,7 +250,7 @@ def InsightTrack(df,df_pos):
 def GenerateVirtualTracker(df,df_wifipos,count_thre = 13,time_thre = 300,dis_thre = 89, speed_thre = 26,label = 'virtual'):
     df_wifiposNew = df_wifipos.copy()
     mac_list = df.m.unique()
-    for mac in tqdm(mac_list):
+    for mac in tqdm(mac_list,desc='生成虚拟探针'):
     #for i in range(1):
         #get df now
         df_now = utils.GetDfNow(df,mac)
