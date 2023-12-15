@@ -22,37 +22,67 @@ def JumpTrackRestore(df_now,
                                         speed_thre)
     track_sets = GetJumpTrackSets(df_count.wifi_a.values,df_count.wifi_b.values)
 
+    return ReplaceJumpTrack(df_now,df_wifipos,track_sets)
 
-    _STATUS_ = [False]*len(track_sets)#记录该mac下每个跳动探针组的激活状态
+def JumpTrackRestoreWithTrackList(df_now,df_wifipos,newTracks):
+    return ReplaceJumpTrack(df_now,df_wifipos,newTracks)
+
+
+def ReplaceJumpTrack(df_now,df_wifipos,track_sets):
+
+    _STATUS_ = [0]*len(track_sets)#记录该mac下每个跳动探针组的激活状态
 
     status_light_list = []#记录每个跳动探针组每个探针的出现状态，当一个探针组中的每个探针都被点亮时，该探针组被激活
 
-    actived_lights_list = []# 用于检测是否在当前状态，当lights中各值为1时，other_count会被清零
-
-    other_count_list = [] #当当前status的other_count>3时退出当前status的激活状态
+    absent_count_list = [] #当属于该状态的任意一个探针连续缺席超过5次时，退出当前激活状态
 
     virtual_track_list = []#记录所有status对应的virtual track
 
     for set in track_sets:
         status_light_list.append(dict(zip(set,[0]*len(set))))
+        absent_count_list.append(dict(zip(set,[0]*len(set))))
         virtual_track_list.append(utils.GetVirtualTrack(df_wifipos,set))
-        actived_lights_list.append(dict(zip(set,[0]*len(set))))
-        other_count_list.append(0)
 
     def CheckActiveState(index):
         #check active state
         for i in range(len(status_light_list)):
-            if 0 not in status_light_list[i] and _STATUS_[i] == False:
+            if 0 not in status_light_list[i].values():
                 # new status activate
-                activeSet_now = track_sets[i]
-                _STATUS_[i] = True
-                #backward at most 5 datas to replace active tracks by virtual track
-                for j in range(5):
-                    index_now = index - j
-                    if index_now < 0:
-                        break
-                    if df_now.iloc[index_now].a in activeSet_now:
-                        df_now.at[index_now,'a'] = virtual_track_list[i]
+                
+                AcitvateState(index,i)
+                
+
+    def AcitvateState(row_index,state_index):
+        activeSet_now = track_sets[state_index]
+        # reset status light
+        status_light_list[state_index] = dict(zip(track_sets[state_index],[0]*len(track_sets[state_index])))
+        # activate state
+        if len(status_light_list[state_index].values()) == 2:
+            _STATUS_[state_index] += 1
+        else:
+            #triangle state activate
+            _STATUS_[state_index] += 100
+        
+        InitState(state_index)
+        #backward at most 5 datas to replace active tracks by virtual track
+        for j in range(5):
+            index_now = row_index - j
+            if index_now < 0:
+                break
+            if df_now.iloc[index_now].a in activeSet_now:
+                df_now.at[index_now,'a'] = virtual_track_list[state_index]
+
+
+    def InitState(state_index):
+        absent_count_list[state_index] = dict(zip(track_sets[state_index],[0]*len(track_sets[state_index])))
+
+    def CheckDeactivateState(state_index):
+        if max(list(absent_count_list[state_index].values()))>5:
+            DeactivateState(state_index)
+
+    def DeactivateState(state_index):
+        status_light_list[state_index] = dict(zip(track_sets[state_index],[0]*len(track_sets[state_index])))
+        _STATUS_[state_index] = 0
 
     #当status[i] = len(track_sets[i])时，激活track_sets[i]
     for index,row in df_now.iterrows():
@@ -60,27 +90,28 @@ def JumpTrackRestore(df_now,
         #record status
         for i in range(len(track_sets)):
             if row.a in track_sets[i]:
-                _STATUS_[i] += 1
+                status_light_list[i][row.a] += 1 
         CheckActiveState(index)
         
         # if row now is active row
-        replaced = False
+        
         for i in range(len(_STATUS_)):
-            if _STATUS_[i] == False:
+            if _STATUS_[i] == 0:
                 continue
             if row.a in track_sets[i]:
-                if not replaced:
+                if _STATUS_[i] == max(_STATUS_):
                     df_now.at[index,'a'] = virtual_track_list[i]
-                    replaced = True
                 
-                actived_lights_list[i][row.a] = 1
-                #all lights on?
-                if 0 not in actived_lights_list[i].values():
-                    other_count_list[i] = 0
-            else:
-                other_count_list[i] += 1
-                if other_count_list[i] > 5:
-                    _STATUS_[i] = False
+                #any absent tracker?
+                keys = list(absent_count_list[i].keys())
+                for key in keys:
+                    if key != row.a:
+                        absent_count_list[i][key] += 1
+                    else:
+                        absent_count_list[i][key] = 0
+            
+            CheckDeactivateState(i)
+                
 
     return utils.DeleteRepeatTrack(df_now)
 
@@ -162,30 +193,22 @@ def GetJumpTrackSets(track_list1,track_list2):
     for i in range(len(track_list1)):
         a = int(track_list1[i])
         b = int(track_list2[i])
-        added = False
+        new_set = set([a,b])
+        track_sets.append(new_set)
+        #find if there are potential triangle set
         for track_set in track_sets:
-            # if a in track_set or b in track_set:
-            #     if len(track_set) == 3:
-            #         if a in track_set and b in track_set:
-            #             added = True
-            #         continue
-            #     track_set.add(a)
-            #     track_set.add(b)
-            #     added = True
-
-            #find if there are potential triangle set
             if a in track_set and len(track_set) == 2:
                 c = _getTrackSetAnotherTrack(track_set,a)
+                if c == b:
+                    continue
                 for other_set in track_sets:
+                    if other_set == track_set:
+                        continue
                     if c in other_set and b in other_set:
-                        #find new triangle
-                        track_sets.remove(track_set)
-                        track_sets.remove(other_set)
+                        #append new triangle
                         track_sets.append(set([a,b,c]))
-                        added = True
                         break
-        if added == False:
-            track_sets.append(set([a,b]))
+
     return track_sets
 
 def _getTrackSetAnotherTrack(track_set,a):
@@ -206,6 +229,9 @@ def AddNewWifiTrack(df_wifiposNew,jumpTrack_sets,label):
         
         #add new track
         newTrack = int(round(random.random(),5)*100000)
+        while newTrack in df_wifiposNew.wifi:
+            newTrack = int(round(random.random(),5)*100000)
+
         xx = 0
         yy = 0
         for track in track_set:
@@ -247,14 +273,46 @@ def InsightTrack(df,df_pos):
     df_insight.meanTime = df_insight.meanTime/df_insight['count']
     return df_insight
 
+def GenerateVirtualTrackerReturnTrackList(df,df_wifipos,count_thre = 13,time_thre = 300,dis_thre = 89, speed_thre = 26,label = 'virtual'):
+    '''
+    return[0]:总共新创建的探针列表
+    return[1]:每个mac下创建虚拟探针的父探针set集合
+    '''
+    df_wifiposNew = df_wifipos.copy()
+    mac_list = df.m.unique()
+    
+    newMacList = [[]]*len(df)
+    i = 0
+    for mac in tqdm(mac_list,desc='生成虚拟探针'):
+        df_now = utils.GetDfNow(df,mac)
+        df_couple = GetJumpWifiTrackCouple(df_now,df_wifiposNew,count_thre,time_thre,dis_thre,speed_thre)
+        if len(df_couple) == 0:
+            continue
+        
+        #get jump track sets
+        track_sets = GetJumpTrackSets(df_couple.wifi_a.values,df_couple.wifi_b.values)
+        newMacList[i] = track_sets
+        #add new virtual tracks
+        df_wifiposNew = AddNewWifiTrack(df_wifiposNew,track_sets,label)
+        i+=1
+
+    df_wifiposNew['restored_x'] = [-1]*len(df_wifiposNew)
+    df_wifiposNew['restored_y'] = [-1]*len(df_wifiposNew)
+    for i,row in df_wifiposNew.iterrows():
+        if row.ID == 'real':
+            df_wifiposNew.at[i,'restored_x'] = row.X
+            df_wifiposNew.at[i,'restored_y'] = row.Y
+
+    return df_wifiposNew,newMacList
+
 def GenerateVirtualTracker(df,df_wifipos,count_thre = 13,time_thre = 300,dis_thre = 89, speed_thre = 26,label = 'virtual'):
+    '''
+    return[0]:总共新创建的探针列表
+    '''
     df_wifiposNew = df_wifipos.copy()
     mac_list = df.m.unique()
     for mac in tqdm(mac_list,desc='生成虚拟探针'):
-    #for i in range(1):
-        #get df now
         df_now = utils.GetDfNow(df,mac)
-        
         df_couple = GetJumpWifiTrackCouple(df_now,df_wifiposNew,count_thre,time_thre,dis_thre,speed_thre)
         if len(df_couple) == 0:
             continue
@@ -263,6 +321,7 @@ def GenerateVirtualTracker(df,df_wifipos,count_thre = 13,time_thre = 300,dis_thr
         track_sets = GetJumpTrackSets(df_couple.wifi_a.values,df_couple.wifi_b.values)
         #add new virtual tracks
         df_wifiposNew = AddNewWifiTrack(df_wifiposNew,track_sets,label)
+        i+=1
 
     df_wifiposNew['restored_x'] = [-1]*len(df_wifiposNew)
     df_wifiposNew['restored_y'] = [-1]*len(df_wifiposNew)
