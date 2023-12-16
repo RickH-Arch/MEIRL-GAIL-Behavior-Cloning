@@ -1,10 +1,15 @@
 import plotly.express as px
 import plotly.io as pio
+pio.templates.default = 'plotly_white'
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
 from PIL import Image
 import os
+from utils import utils
+from tqdm import tqdm
+
+
 img_path = os.getcwd()+'/wifi_track_data/dacang/imgs/roads.png'
 img = Image.open(img_path)
 background_img = img
@@ -145,6 +150,8 @@ def Scatter_2D(df,x_name,y_name,label_name = '',bg_img = 0):
     fig.update_yaxes(visible=False)
 
     fig.show()
+
+# def Track_2D(df,x_name,y_name,label_name = '',bg_img = 0):
 
 
 def Scatter_2D_Subplot(data_tuple_list,bg_img_path = ""):
@@ -360,7 +367,7 @@ def Boxes(list_tuple,box_title = ""):
     fig.show()
 
 
-def Track_3D(x,y,z,x_name = "",y_name = "",z_name = ""):
+def Track_3D(x,y,z,x_name = "",y_name = "",z_name = "",marker_size = 3,line_width = 3):
     dum_img = Image.fromarray(np.ones((3,3,3), dtype='uint8')).convert('P', palette='WEB')
     idx_to_color = np.array(dum_img.getpalette()).reshape((-1, 3))
     colorscale=[[i/255.0, "rgb({}, {}, {})".format(*rgb)] for i, rgb in enumerate(idx_to_color)]
@@ -374,11 +381,11 @@ def Track_3D(x,y,z,x_name = "",y_name = "",z_name = ""):
     marker=dict(
         color=z,
         colorscale='Viridis',
-        size=3,
+        size=marker_size,
     ),
     line=dict(
         color='rgba(50,50,50,0.6)',
-        width=3,
+        width=line_width,
         
     )
     ))
@@ -455,3 +462,165 @@ def Track3D_Virtual(df_now,df_wifiPos):
         x.append(df_wifiPos[df_wifiPos.wifi == row.a].iloc[0].restored_x)
         y.append(df_wifiPos[df_wifiPos.wifi == row.a].iloc[0].restored_y)
     Track_3D(x,y,z)
+
+def GetPath(start,end,df_path):
+        for i,row in df_path.iterrows():
+            starts,destis = row.path.split('->')
+            starts = starts.split(':')
+            destis = destis.split(':')
+            if str(start) in starts and str(end) in destis:
+                return [x for x in row[1:] if str(x) != 'nan']
+        return None
+
+def Track3D_Restored(df_now,df_wifipos,df_path):
+    def _append_pos(df_wifipos,tracker,time):
+        z.append(time)
+        x.append(df_wifipos[df_wifipos.wifi == tracker].iloc[0].restored_x)
+        y.append(df_wifipos[df_wifipos.wifi == tracker].iloc[0].restored_y)
+
+    def _append_path(df_path,start,end,start_time,end_time):
+        path_points = GetPath(start,end,df_path)
+        
+        if len(path_points) == 0:
+            return
+        length = len(path_points)
+        for i,point in enumerate(path_points):
+            z.append(start_time + (i+1)*(end_time-start_time)/(length+1))
+            xx,yy = point.split(':')
+            x.append(float(xx))
+            y.append(float(yy))
+
+    x = []
+    y = []
+    z = []
+    wifi_last = -1
+    for index,row in df_now.iterrows():
+        if index == 0:
+            wifi_last = row.a
+            continue  
+        if row.a == wifi_last:
+            _append_pos(df_wifipos,row.a,row.t.hour+(row.t.minute/60))
+        else:
+            row_last = df_now.iloc[index-1]
+            time_start = row_last.t.hour+(row_last.t.minute/60)
+            time_end = row.t.hour+(row.t.minute/60)
+            _append_path(df_path,row_last.a,row.a,time_start,time_end)
+            wifi_last = row.a
+    Track_3D(x,y,z,marker_size=2,line_width=6)
+
+
+def _addTrackCount(track_list,track_count,track,add_num = 1):
+        for i,t in enumerate(track_list):
+            if t == track or t == (track[1],track[0]):
+                track_count[i] += add_num
+                return True
+        return False
+
+def _getPathAndStay(df_now,df_wifipos,df_path,pass_path,pass_count,stay_pos,stay_count):
+    wifi_last = -1
+    for index,row in df_now.iterrows():
+        if index == 0:
+            wifi_last = row.a
+            continue
+        #stay at same place ?
+        if row.a == wifi_last:
+            last_time = (row.t - df_now.iloc[index-1].t).total_seconds()
+            loc = utils.GetRestoredLocation(df_wifipos,row.a)
+            if _addTrackCount(stay_pos,stay_count,loc,last_time) == False:
+                stay_pos.append(loc)
+                stay_count.append(last_time)
+        #place changed
+        else:
+            paths = GetPath(wifi_last,row.a,df_path)
+            last_loc = 0
+            for i in range(len(paths)):
+                loc_str = paths[i].split(':')
+                loc = [float(loc_str[0]),float(loc_str[1])]
+                if i == 0:
+                    last_loc = loc
+                    continue
+                path = (last_loc,loc)
+                if _addTrackCount(pass_path,pass_count,path) == False:
+                    pass_path.append(path)
+                    pass_count.append(1)
+                last_loc = loc
+            wifi_last = row.a
+
+def Track2D_Restored(df,df_wifipos,df_path,show_freq = True):
+    mac_list = df.m.unique()
+
+    pass_path= [] # [tuple1([x1,y1],[x2,y2]),tuple2([x1,y1],[x2,y2])...]"
+    pass_count = []
+    stay_pos = [] # [[x1,y1],[x2,y2]...]
+    stay_count = []
+    
+    for mac in tqdm(mac_list):
+        df_now = utils.GetDfNow(df,mac)
+        _getPathAndStay(df_now,df_wifipos,df_path,pass_path,pass_count,stay_pos,stay_count)
+    
+    
+    if show_freq:
+        Track_2D(pass_path,pass_count,stay_pos,stay_count)
+
+def Track_2D(pass_path, pass_count=None, stay_pos=None, stay_count=None):
+
+    fig = go.Figure()
+    if pass_count != None:
+        # normalize counts
+        if max(pass_count)>50:
+            pass_count = utils.Normalize_arr(pass_count)
+            min_pass_count = min(pass_count) if min(pass_count)>0.1 else 0.1
+            pass_count = (1/min_pass_count)*pass_count
+        stay_count = utils.Normalize_arr(stay_count)*20
+
+        #add move trace
+        for i, path in enumerate(pass_path):
+            xx = [path[0][0], path[1][0]]
+            yy = [path[0][1], path[1][1]]
+            fig.add_trace(go.Scatter(
+                x=xx, y=yy,
+                line=dict(color='firebrick', width=pass_count[i]),
+                showlegend=False,
+                mode='lines',
+            ))
+        #add stay trace
+        xx = []
+        yy = []
+        for i,pos in enumerate(stay_pos):
+            xx.append(pos[0])
+            yy.append(pos[1])
+        fig.add_trace(
+            go.Scatter(x = xx,y = yy,
+                        marker_size = stay_count,
+                       mode="markers",
+                       marker_color = "firebrick",
+                       showlegend=False)
+        )
+
+    fig.update_layout(
+        xaxis=dict(range=[0, 400]),  # Set x-axis range
+        yaxis=dict(range=[0, 300]),  # Set y-axis range
+        width=400, height=300,
+        margin=dict(
+        l=10,
+        r=10,
+        b=10,
+        t=10,
+        pad=4
+        ),
+        
+    )
+
+    fig.add_layout_image(
+            dict(
+                source=background_img,
+                xref="x", yref="y",
+                x=0, y=0,  #position of the upper left corner of the image in subplot 1,1
+                sizex= 400,sizey= 300, #sizex, sizey are set by trial and error
+                xanchor="left",
+                yanchor="bottom",
+                sizing="stretch",
+                layer="below",
+                opacity=0.3)
+    )
+    fig.show()

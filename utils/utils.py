@@ -217,3 +217,6 @@ def GetDriftingTrackMarks(df_now):
                 t1 = t1 = row.t - df_now.iloc[i-1].t
     return del_marks
 
+def GetRestoredLocation(df_wifipos,wifi):
+    return df_wifipos[df_wifipos.wifi == wifi].iloc[0][['restored_x','restored_y']].tolist()
+
