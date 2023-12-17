@@ -225,7 +225,8 @@ def Parents_2D(df,ID = "virtual"):
     fig = go.Figure()
     for set in parents_sets:
         fig.add_trace(go.Scatter(x=set[0], y=set[1],
-                            line=dict(width=1)))
+                            line=dict(width=1),
+                            showlegend=False,))
     
     fig.add_layout_image(
             dict(
@@ -241,7 +242,7 @@ def Parents_2D(df,ID = "virtual"):
     )
 
     fig.update_layout(
-        width=500,
+        width=400,
         height=300,
         autosize = False,
         
@@ -358,6 +359,7 @@ def Boxes(list_tuple,box_title = ""):
         row=1, col=i+1
     )
     fig.update_traces(boxpoints='all', jitter=.2)
+    fig.update_layout(height=400, width=300*len(list_tuple))
     
     if box_title == "":
         fig.update_layout(title_text="Box Plot")
@@ -624,3 +626,4 @@ def Track_2D(pass_path, pass_count=None, stay_pos=None, stay_count=None):
                 opacity=0.3)
     )
     fig.show()
+
