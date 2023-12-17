@@ -28,7 +28,7 @@ df_wifipos['ID'] = ["N"]*len(df_wifipos)
 epoch = 1
 
 
-def TrackRestore(df,df_wifipos,count_thre=0,time_thre=0,distance_thre=0,speed_thre=0):
+def TrackRestore(df,df_wifipos):
     '''
     return[0]: newTracker_count
     return[1]: df
@@ -52,28 +52,13 @@ def TrackRestore(df,df_wifipos,count_thre=0,time_thre=0,distance_thre=0,speed_th
     df_insight.to_csv(os.getcwd()+f"/wifi_track_data/dacang/track_data/processing_data/insight_3_epoch{epoch}_{date}.csv",index=False)
     #df_insight = pd.read_csv(os.getcwd()+f"/wifi_track_data/dacang/track_data/processing_data/insight_3_epoch{epoch}_1214.csv")
 
-    #获取切换次数临界值 - Q3
-    if count_thre == 0:
-        count_thre = BoxFeature(df_insight['count'])[4]
-        if count_thre < 8:
-            count_thre = 8
-
-    #获取平均切换时间 - Q3+50
-    if time_thre == 0:
-        time_thre = BoxFeature(df_insight['meanTime'])[4]+50
-
-    #获取满足次数下的平均切换距离 - count>count_thre -> Q3
-    if distance_thre == 0:
-        distance_thre = BoxFeature(df_insight[df_insight['count']>count_thre]['distance'])[4]
-
-    #获取满足次数下的最大切换速度 - count>count_thre -> Q1
-    if speed_thre == 0:
-        speed_thre = BoxFeature(df_insight[df_insight['count']>count_thre]['maxSpeed'])[2]
-
+    enforce_count_thre,count_thre,time_thre,distance_thre,speed_thre = TrackCleaner.AutoGetThreshold(df_insight)
+    
     
     #------------生成虚拟探针------------
-    df_wifiposNew,track_list = TrackCleaner.GenerateVirtualTrackerReturnTrackList(df,
+    df_wifiposNew,normalTrack_list,enforceTrack_list = TrackCleaner.GenerateVirtualTrackerReturnTrackList(df,
                                     df_wifipos,
+                                    enforce_count_thre=enforce_count_thre,
                                     count_thre = count_thre,
                                     time_thre = time_thre,
                                     dis_thre = distance_thre, 
@@ -91,9 +76,9 @@ def TrackRestore(df,df_wifipos,count_thre=0,time_thre=0,distance_thre=0,speed_th
     i = 0
     changed = False
     for mac in tqdm(mac_list,desc='替换跳动轨迹'):
-        df_now = utils.GetDfNowElimRepeat(df,mac)
-        if len(track_list[i]) > 0:
-            df_result = TrackCleaner.JumpTrackRestoreWithTrackList(df_now,df_wifiposNew,track_list[i])
+        if len(enforceTrack_list[i])+len(normalTrack_list[i]) > 0:
+            df_now = utils.GetDfNowElimRepeat(df,mac)
+            df_result = TrackCleaner.JumpTrackRestoreWithTrackList(df_now,df_wifiposNew,enforceTrack_list[i],normalTrack_list[i])
             if df_result.equals(df_now) == False:
                 changed = True
             df_now = df_result

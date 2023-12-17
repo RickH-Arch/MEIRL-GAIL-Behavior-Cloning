@@ -5,6 +5,7 @@ import math
 import os
 from utils import utils
 from tqdm import tqdm
+from utils.BoxFeatures import BoxFeature
 
 
 def JumpTrackRestore(df_now,
@@ -24,11 +25,16 @@ def JumpTrackRestore(df_now,
 
     return ReplaceJumpTrack(df_now,df_wifipos,track_sets)
 
-def JumpTrackRestoreWithTrackList(df_now,df_wifipos,newTracks):
-    return ReplaceJumpTrack(df_now,df_wifipos,newTracks)
+def JumpTrackRestoreWithTrackList(df_now,df_wifipos,track_sets_enforce,track_sets):
+    if len(track_sets_enforce)>0:
+        ReplaceJumpTrack(df_now,df_wifipos,track_sets_enforce,enforce=True)
+    return ReplaceJumpTrack(df_now,df_wifipos,track_sets)
 
 
-def ReplaceJumpTrack(df_now,df_wifipos,track_sets):
+def ReplaceJumpTrack(df_now,df_wifipos,track_sets,enforce = False):
+    '''
+    when enforce == True, status won't be deactivated from the time it be activated
+    '''
 
     _STATUS_ = [0]*len(track_sets)#记录该mac下每个跳动探针组的激活状态
 
@@ -81,12 +87,32 @@ def ReplaceJumpTrack(df_now,df_wifipos,track_sets):
             DeactivateState(state_index)
 
     def DeactivateState(state_index):
+        if enforce == True:
+            return
         status_light_list[state_index] = dict(zip(track_sets[state_index],[0]*len(track_sets[state_index])))
         _STATUS_[state_index] = 0
-
+    
+    t1 = df_now.iloc[0].t
+    time_delta1 = 0
+    lock_list = []
     #当status[i] = len(track_sets[i])时，激活track_sets[i]
     for index,row in df_now.iterrows():
+
+        #deactivate all state if time_delta1 > 30min
+        time_delta2 = row.t - t1
         
+        if time_delta2.total_seconds() > 1800 and enforce == False:
+            for i in range(len(_STATUS_)):
+                DeactivateState(i)
+
+        #lock data if row now is time isolated
+        if time_delta1 != 0:
+            if time_delta1> pd.Timedelta('30min') and time_delta2>pd.Timedelta('30min'):
+                lock_list.append({index:row.a})
+
+        t1 = row.t
+        time_delta1 = time_delta2
+
         #record status
         for i in range(len(track_sets)):
             if row.a in track_sets[i]:
@@ -98,9 +124,14 @@ def ReplaceJumpTrack(df_now,df_wifipos,track_sets):
         for i in range(len(_STATUS_)):
             if _STATUS_[i] == 0:
                 continue
+            changed = False
             if row.a in track_sets[i]:
                 if _STATUS_[i] == max(_STATUS_):
+                    changed = True
                     df_now.at[index,'a'] = virtual_track_list[i]
+                if enforce and changed == False:
+                    df_now.at[index,'a'] = virtual_track_list[i]
+
                 
                 #any absent tracker?
                 keys = list(absent_count_list[i].keys())
@@ -111,7 +142,11 @@ def ReplaceJumpTrack(df_now,df_wifipos,track_sets):
                         absent_count_list[i][key] = 0
             
             CheckDeactivateState(i)
-                
+
+    #restore locked data   
+    for lock in lock_list:
+        for key,value in lock.items():
+            df_now.at[key,'a'] = value
 
     return utils.DeleteRepeatTrack(df_now)
 
@@ -211,6 +246,31 @@ def GetJumpTrackSets(track_list1,track_list2):
 
     return track_sets
 
+def GetEnforceJumpTrackSets(track_list1,track_list2):
+    if len(track_list1) != len(track_list2):
+        return
+    track_sets = []
+    for i in range(len(track_list1)):
+        a = int(track_list1[i])
+        b = int(track_list2[i])
+        added = False
+        for track_set in track_sets:
+        #find if there are potential triangle set
+            if a in track_set and len(track_set) == 2:
+                c = _getTrackSetAnotherTrack(track_set,a)
+                for other_set in track_sets:
+                    if c in other_set and b in other_set and len(other_set) == 2:
+                        #find new triangle
+                        track_sets.remove(track_set)
+                        track_sets.remove(other_set)
+                        track_sets.append(set([a,b,c]))
+                        added = True
+                        break
+        if added == False:
+            track_sets.append(set([a,b]))
+    return track_sets
+
+
 def _getTrackSetAnotherTrack(track_set,a):
     '''
     return a *two value* track_set's another track
@@ -229,7 +289,7 @@ def AddNewWifiTrack(df_wifiposNew,jumpTrack_sets,label):
         
         #add new track
         newTrack = int(round(random.random(),5)*100000)
-        while newTrack in df_wifiposNew.wifi:
+        while newTrack in df_wifiposNew.wifi or newTrack<1000:
             newTrack = int(round(random.random(),5)*100000)
 
         xx = 0
@@ -273,7 +333,14 @@ def InsightTrack(df,df_pos):
     df_insight.meanTime = df_insight.meanTime/df_insight['count']
     return df_insight
 
-def GenerateVirtualTrackerReturnTrackList(df,df_wifipos,count_thre = 13,time_thre = 300,dis_thre = 89, speed_thre = 26,label = 'virtual'):
+def GenerateVirtualTrackerReturnTrackList(df,
+                                          df_wifipos,
+                                          enforce_count_thre = 50,
+                                          count_thre = 13,
+                                          time_thre = 300,
+                                          dis_thre = 89, 
+                                          speed_thre = 26,
+                                          label = 'virtual'):
     '''
     return[0]:总共新创建的探针列表
     return[1]:每个mac下创建虚拟探针的父探针set集合
@@ -281,19 +348,29 @@ def GenerateVirtualTrackerReturnTrackList(df,df_wifipos,count_thre = 13,time_thr
     df_wifiposNew = df_wifipos.copy()
     mac_list = df.m.unique()
     
-    newMacList = [[]]*len(df)
+    normalSets_list = [[]]*len(df)
+    enforceSets_list = [[]]*len(df)
     i = 0
     for mac in tqdm(mac_list,desc='生成虚拟探针'):
         df_now = utils.GetDfNow(df,mac)
+
+        #获取跳动探针对
         df_couple = GetJumpWifiTrackCouple(df_now,df_wifiposNew,count_thre,time_thre,dis_thre,speed_thre)
         if len(df_couple) == 0:
             continue
+
+        #生成跳动探针组
+        df_couple_enforce = df_couple[df_couple['count']>=enforce_count_thre]
+        df_couple = df_couple[df_couple['count']<enforce_count_thre]
+        track_sets_enforce = GetEnforceJumpTrackSets(df_couple_enforce.wifi_a.values,df_couple_enforce.wifi_b.values)
+        track_sets_normal = GetJumpTrackSets(df_couple.wifi_a.values,df_couple.wifi_b.values)
+        track_sets_all = track_sets_normal+track_sets_enforce
         
-        #get jump track sets
-        track_sets = GetJumpTrackSets(df_couple.wifi_a.values,df_couple.wifi_b.values)
-        newMacList[i] = track_sets
-        #add new virtual tracks
-        df_wifiposNew = AddNewWifiTrack(df_wifiposNew,track_sets,label)
+        normalSets_list[i] = track_sets_normal
+        enforceSets_list[i] = track_sets_enforce
+
+        #添加新探针到探针信息列表
+        df_wifiposNew = AddNewWifiTrack(df_wifiposNew,track_sets_all,label)
         i+=1
 
     df_wifiposNew['restored_x'] = [-1]*len(df_wifiposNew)
@@ -303,7 +380,7 @@ def GenerateVirtualTrackerReturnTrackList(df,df_wifipos,count_thre = 13,time_thr
             df_wifiposNew.at[i,'restored_x'] = row.X
             df_wifiposNew.at[i,'restored_y'] = row.Y
 
-    return df_wifiposNew,newMacList
+    return df_wifiposNew,normalSets_list,enforceSets_list
 
 def GenerateVirtualTracker(df,df_wifipos,count_thre = 13,time_thre = 300,dis_thre = 89, speed_thre = 26,label = 'virtual'):
     '''
@@ -331,3 +408,35 @@ def GenerateVirtualTracker(df,df_wifipos,count_thre = 13,time_thre = 300,dis_thr
             df_wifiposNew.at[i,'restored_y'] = row.Y
 
     return df_wifiposNew
+
+def AutoGetThreshold(df_insight):
+    '''
+    return[0]:enforce_count_thre
+    return[1]:count_thre
+    return[2]:time_thre
+    return[3]:dis_thre
+    return[4]:speed_thre
+    '''
+    #获取强制转换切换次数临界值
+    enforce_count_thre = BoxFeature(df_insight['count'])[5] #upper fence
+    if enforce_count_thre < 50:
+        enforce_count_thre = 50
+
+    #获取切换次数临界值 - Q3
+    count_thre = BoxFeature(df_insight['count'])[4]
+    if count_thre < 8:
+        count_thre = 8
+
+    #获取平均切换时间 - Q3+50
+    
+    time_thre = BoxFeature(df_insight['meanTime'])[4]+50
+
+    #获取满足次数下的平均切换距离 - count>count_thre -> Q3
+    
+    distance_thre = BoxFeature(df_insight[df_insight['count']>count_thre]['distance'])[4]
+
+    #获取满足次数下的最大切换速度 - count>count_thre -> Q1
+    
+    speed_thre = BoxFeature(df_insight[df_insight['count']>count_thre]['maxSpeed'])[2]
+
+    return enforce_count_thre,count_thre,time_thre,distance_thre,speed_thre
