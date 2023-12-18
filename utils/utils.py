@@ -100,7 +100,8 @@ def GetRepeatTrack(df_now):
     ind_list = []
     end_mark = df_now.iloc[len(df_now)-1].mark
     for index,row in df_now.iterrows():
-        
+        if index == 0:
+            continue
         if row.a == track_now:
             if row.mark == end_mark:
                 if len(ind_list)>2:

@@ -16,7 +16,7 @@ import time
 
 track_data_path = "wifi_track_data/dacang/track_data/dacang_track_data_2_1217.csv"
 #track_data_path = r"wifi_track_data\dacang\track_data\dacang_track_data_3_epoch6_1217.csv"
-wifipos_path = 'wifi_track_data/dacang/pos_data/wifi_pos.csv'
+wifipos_path = 'wifi_track_data/dacang/pos_data/wifi_pos_origin.csv'
 #wifipos_path = r"wifi_track_data\dacang\pos_data\processing_data\wifiposNew_needRestore_3_epoch6_1217.csv"
 potential_wifipos_path = 'wifi_track_data/dacang/pos_data/potential_wifi_pos.csv'
 
@@ -153,11 +153,12 @@ with tqdm(total=len(df_wifipos),desc="合并重复探针") as pbar:
                     df_wifipos.at[index,'children'] = ""
                 df_wifipos.at[index,'children'] = df_wifipos.at[index,'children'] + (str(row_now.wifi)+':')
 df_wifipos = df_wifipos[df_wifipos.activated == 1].reset_index().drop('index',axis=1)
-df_wifipos.to_csv(os.getcwd()+f"/wifi_track_data/dacang/pos_data/wifi_pos_merged_3_{date}.csv",index=False)
+df_wifipos.to_csv(os.getcwd()+f"/wifi_track_data/dacang/pos_data/wifi_pos_new_3_{date}.csv",index=False)
 
 #-----------删除重复探针-----------
-#df_wifipos = pd.read_csv("wifi_track_data/dacang/pos_data/processing_data/wifi_pos_merged_3_epoch1_1216.csv")
-#df = pd.read_csv("wifi_track_data/dacang/track_data/dacang_track_data_3_epoch18_1216.csv")
+#df_wifipos = pd.read_csv(r'wifi_track_data\dacang\pos_data\wifi_pos_merged_3_1218.csv')
+#df = pd.read_csv(r'wifi_track_data\dacang\track_data\processing_data\dacang_track_data_3_epoch7_1218.csv')
+#df.t = pd.to_datetime(df.t)
 #mac_list = df.m.unique()
 df_new = pd.DataFrame(columns=df.columns)
 with tqdm(total=len(mac_list),desc="删除重复探针") as pbar:
@@ -195,10 +196,10 @@ df.to_csv(os.getcwd()+f"/wifi_track_data/dacang/track_data/dacang_track_data_3_f
 
 #---------清除一直在同一地方的mac----------
 
-list_count = df.groupby(['m']).a.value_counts()
-dd = list_count.to_frame().rename(columns={'a':'A'}).reset_index()
-mac_Once = dd[~dd.duplicated('m', keep=False)].m.reset_index().drop('index',axis=1)
-df = df.loc[~df.m.isin(mac_Once.m)]
+# list_count = df.groupby(['m']).a.value_counts()
+# dd = list_count.to_frame().rename(columns={'a':'A'}).reset_index()
+# mac_Once = dd[~dd.duplicated('m', keep=False)].m.reset_index().drop('index',axis=1)
+# df = df.loc[~df.m.isin(mac_Once.m)]
 
 
-df.to_csv(os.getcwd()+f"/wifi_track_data/dacang/track_data/dacang_track_data_3_final_deleteOnePlace_{date}.csv",index=False)
+# df.to_csv(os.getcwd()+f"/wifi_track_data/dacang/track_data/dacang_track_data_3_final_deleteOnePlace_{date}.csv",index=False)
