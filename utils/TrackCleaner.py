@@ -27,8 +27,8 @@ def JumpTrackRestore(df_now,
 
 def JumpTrackRestoreWithTrackList(df_now,df_wifipos,track_sets_enforce,track_sets):
     if len(track_sets_enforce)>0:
-        ReplaceJumpTrack(df_now,df_wifipos,track_sets_enforce,enforce=True)
-    return ReplaceJumpTrack(df_now,df_wifipos,track_sets)
+        df_now = ReplaceJumpTrack(df_now,df_wifipos,track_sets_enforce,enforce=True)
+    return ReplaceJumpTrack(df_now,df_wifipos,track_sets,enforce=False)
 
 
 def ReplaceJumpTrack(df_now,df_wifipos,track_sets,enforce = False):
@@ -70,27 +70,43 @@ def ReplaceJumpTrack(df_now,df_wifipos,track_sets,enforce = False):
             _STATUS_[state_index] += 100
         
         InitState(state_index)
-        #backward at most 5 datas to replace active tracks by virtual track
-        for j in range(5):
-            index_now = row_index - j
-            if index_now < 0:
-                break
-            if df_now.iloc[index_now].a in activeSet_now:
-                df_now.at[index_now,'a'] = virtual_track_list[state_index]
+        if enforce == False or row_index>200:
+            #backward at most 5 datas to replace active tracks by virtual track
+            for j in range(5):
+                index_now = row_index - j
+                if index_now < 0:
+                    break
+                if df_now.iloc[index_now].a in activeSet_now:
+                    df_now.at[index_now,'a'] = virtual_track_list[state_index]
+                    
+        else:
+            for j in range(row_index):
+                ind_now = row_index -j
+                EnforceReplaceTrack(ind_now)
 
 
     def InitState(state_index):
         absent_count_list[state_index] = dict(zip(track_sets[state_index],[0]*len(track_sets[state_index])))
 
-    def CheckDeactivateState(state_index):
-        if max(list(absent_count_list[state_index].values()))>5:
-            DeactivateState(state_index)
+    def CheckDeactivateState():
+        for state_index in range(len(_STATUS_)):
+            if max(list(absent_count_list[state_index].values()))>5:
+                DeactivateState(state_index)
 
     def DeactivateState(state_index):
         if enforce == True:
             return
         status_light_list[state_index] = dict(zip(track_sets[state_index],[0]*len(track_sets[state_index])))
         _STATUS_[state_index] = 0
+
+    def EnforceReplaceTrack(row_index):
+        for i in range(len(_STATUS_)):
+            if _STATUS_[i] == 0:
+                continue
+            if row.a in track_sets[i]:
+                if _STATUS_[i] == max(_STATUS_):
+                    df_now.at[row_index,'a'] = virtual_track_list[i]
+                    return
     
     t1 = df_now.iloc[0].t
     time_delta1 = 0
@@ -141,7 +157,7 @@ def ReplaceJumpTrack(df_now,df_wifipos,track_sets,enforce = False):
                     else:
                         absent_count_list[i][key] = 0
             
-            CheckDeactivateState(i)
+        CheckDeactivateState()
 
     #restore locked data   
     for lock in lock_list:
@@ -335,11 +351,11 @@ def InsightTrack(df,df_pos):
 
 def GenerateVirtualTrackerReturnTrackList(df,
                                           df_wifipos,
-                                          enforce_count_thre = 50,
-                                          count_thre = 13,
-                                          time_thre = 300,
-                                          dis_thre = 89, 
-                                          speed_thre = 26,
+                                          enforce_count_thre,
+                                          count_thre,
+                                          time_thre,
+                                          dis_thre, 
+                                          speed_thre,
                                           label = 'virtual'):
     '''
     return[0]:总共新创建的探针列表
@@ -348,10 +364,11 @@ def GenerateVirtualTrackerReturnTrackList(df,
     df_wifiposNew = df_wifipos.copy()
     mac_list = df.m.unique()
     
-    normalSets_list = [[]]*len(df)
-    enforceSets_list = [[]]*len(df)
-    i = 0
+    normalSets_list = [[]]*len(mac_list)
+    enforceSets_list = [[]]*len(mac_list)
+    i = -1
     for mac in tqdm(mac_list,desc='生成虚拟探针'):
+        i+=1
         df_now = utils.GetDfNow(df,mac)
 
         #获取跳动探针对
@@ -371,7 +388,7 @@ def GenerateVirtualTrackerReturnTrackList(df,
 
         #添加新探针到探针信息列表
         df_wifiposNew = AddNewWifiTrack(df_wifiposNew,track_sets_all,label)
-        i+=1
+        
 
     df_wifiposNew['restored_x'] = [-1]*len(df_wifiposNew)
     df_wifiposNew['restored_y'] = [-1]*len(df_wifiposNew)
