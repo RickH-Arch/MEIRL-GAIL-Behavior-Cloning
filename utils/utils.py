@@ -6,6 +6,9 @@ import pandas as pd
 import random
 import math
 import os
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
+from sklearn.metrics import calinski_harabasz_score
 
 
 
@@ -62,7 +65,6 @@ def _add_data(df,col_name,list):
     # myplot.Surface3D(df_3d.drop('eps',axis=1).values,df_3d.eps,df_3d.columns[1:],
     #                 x_name = 'eps',y_name = "min_samples")
 
-
 def ShowClusterResult(df,col_name_list,cut_thre = 0,cut_col_name = "",cut_mode = ''):
     if cut_thre != 0 :
         df_result = _cut_Data_By_Thre(df,col_name_list,cut_thre,cut_col_name,cut_mode)
@@ -90,9 +92,6 @@ def _getDistance(track1_pos,track2_pos):
     x = track2_pos[0]-track1_pos[0]
     y = track2_pos[1]-track1_pos[1]
     return math.sqrt(x*x + y*y)
-
-
-
 
 def GetRepeatTrack(df_now):
     del_list = []
@@ -165,7 +164,6 @@ def GetDfNowElimRepeat(df,mac):
     df_now = GetDfNow(df,mac)
     return DeleteRepeatTrack(df_now)
 
-
 def PushValue(list,value,max_len):
     list.append(value)
     if(len(list)>max_len):
@@ -221,3 +219,30 @@ def GetDriftingTrackMarks(df_now):
 def GetRestoredLocation(df_wifipos,wifi):
     return df_wifipos[df_wifipos.wifi == wifi].iloc[0][['restored_x','restored_y']].tolist()
 
+def DfToRowList(df,col_names):
+    row_list = []
+    for index,row in df.iterrows():
+        row_list.append(row[col_names].tolist())
+    return row_list
+
+def GetKmeansClusterNumDf(df,col_names):
+    X = np.array(DfToRowList(df,col_names))
+    n_clusters_list = []
+    calinski = []
+    silhouette = []
+    for n_clusters in range(2,10):
+        n_clusters_list.append(n_clusters)
+        kmeans = KMeans(n_clusters=n_clusters,init="k-means++",max_iter=300, random_state=0).fit(X)
+        labels = kmeans.labels_
+        calinski.append(calinski_harabasz_score(X, labels))
+        silhouette.append(silhouette_score(X, labels))
+        
+    df_score = pd.DataFrame({'n_clusters':n_clusters_list,
+                            'calinski':calinski,
+                            'silhouette':silhouette})
+    return df_score
+
+def Kmeans(df,col_names,cluster_num):
+    X = np.array(DfToRowList(df,col_names))
+    kmeans = KMeans(n_clusters=cluster_num,init="k-means++",max_iter=300, random_state=0).fit(X)
+    return kmeans.labels_
