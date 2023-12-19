@@ -14,6 +14,12 @@ img_path = os.getcwd()+'/wifi_track_data/dacang/imgs/roads.png'
 img = Image.open(img_path)
 background_img = img
 buttom_img = Image.fromarray(np.array(img.transpose(Image.FLIP_TOP_BOTTOM))).convert('P', palette='WEB', dither=None)
+dum_img = Image.fromarray(np.ones((3,3,3), dtype='uint8')).convert('P', palette='WEB')
+idx_to_color = np.array(dum_img.getpalette()).reshape((-1, 3))
+colorscale=[[i/255.0, "rgb({}, {}, {})".format(*rgb)] for i, rgb in enumerate(idx_to_color)]
+im_x = np.linspace(0, 400, 400)
+im_y = np.linspace(0, 300, 300)
+im_z = np.zeros((300,400))
 
 colors = ['rgb(67,67,67)', 'rgb(115,115,115)']
 line_size = [2,2,2,2]
@@ -151,9 +157,6 @@ def Scatter_2D(df,x_name,y_name,label_name = '',bg_img = 0):
 
     fig.show()
 
-# def Track_2D(df,x_name,y_name,label_name = '',bg_img = 0):
-
-
 def Scatter_2D_Subplot(data_tuple_list,bg_img_path = ""):
     '''
     !!!unfixed!!!
@@ -264,8 +267,6 @@ def Parents_2D(df,ID = "virtual"):
     )
     fig.show()
 
-    
-
 def Scatter_3D(df,x_name,y_name,z_name,species_name = "",color_name = ""):
     '''
     绘制打上时间标签并聚类后的3d scatter
@@ -370,10 +371,6 @@ def Boxes(list_tuple,box_title = ""):
 
 
 def Track_3D(x,y,z,x_name = "",y_name = "",z_name = "",marker_size = 3,line_width = 3):
-    dum_img = Image.fromarray(np.ones((3,3,3), dtype='uint8')).convert('P', palette='WEB')
-    idx_to_color = np.array(dum_img.getpalette()).reshape((-1, 3))
-    colorscale=[[i/255.0, "rgb({}, {}, {})".format(*rgb)] for i, rgb in enumerate(idx_to_color)]
-    
     fig = go.Figure()
     fig.add_trace(go.Scatter3d(
     x=x, 
@@ -392,9 +389,7 @@ def Track_3D(x,y,z,x_name = "",y_name = "",z_name = "",marker_size = 3,line_widt
     )
     ))
 
-    im_x = np.linspace(0, 400, 400)
-    im_y = np.linspace(0, 300, 300)
-    im_z = np.zeros((300,400))
+    
 
     #add buttom background image
     fig.add_trace(go.Surface(x=im_x, y=im_y, z=im_z,
@@ -432,7 +427,7 @@ def Track_3D(x,y,z,x_name = "",y_name = "",z_name = "",marker_size = 3,line_widt
                 zaxis_visible=True, 
                 xaxis_title="X",
                 yaxis_title="Y",
-                zaxis_title="Z" ,
+                zaxis_title="hour" ,
             aspectmode = 'manual',
             aspectratio=dict(x=1, y=0.75, z=0.75),
             xaxis = dict(nticks=4, range=[0,400],),
@@ -445,7 +440,110 @@ def Track_3D(x,y,z,x_name = "",y_name = "",z_name = "",marker_size = 3,line_widt
 
     fig.show()
 
+def Track_3D_subplot(df_list,mac,df_wifipos,marker_size = 3,line_width = 3):
+    track_list = []
+    for i,df in enumerate(df_list):
+        df_now = utils.GetDfNow(df,mac)
+        x,y,z = GetOriginXYZ(df_now,df_wifipos)
+        track_list.append([[x,y,z],f"epoch{i}"])
+    if len(track_list) == 0:
+        return
+    track_list[0][1] = "origin"
+    track_list[len(track_list)-1][1] = "final"
+    col_num = 3
+    row_num = float.__ceil__(len(track_list)/col_num)
+
+    #get specs
+    list_specs = []
+    for i in range(row_num):
+        l = []
+        for j in range(col_num):
+            l.append({'type':'scatter3d'})
+        list_specs.append(l)
+
+    #get name tuple
+    name_list = []
+    for i in range(len(track_list)):
+        name_list.append(track_list[i][1])
+    name_tuple = tuple(name_list)
+
+    fig = make_subplots(
+        rows=row_num, cols=col_num,
+        specs=list_specs,
+        subplot_titles=name_tuple
+    )
+
+    for i in range(len(track_list)):
+        t = track_list[i]
+        row_loc = int(i/col_num)+1
+        col_loc = i%col_num+1
+        fig.add_trace(
+            go.Scatter3d(
+                x=t[0][0], 
+                y=t[0][1], 
+                z=t[0][2],
+                
+                marker=dict(
+                    color=z,
+                    colorscale='Viridis',
+                    size=marker_size,
+                ),
+                line=dict(
+                    color='rgba(50,50,50,0.6)',
+                    width=line_width,
+                ),
+            ),
+            row=row_loc, col=col_loc,
+        )
+        fig.add_trace(go.Surface(x=im_x, y=im_y, z=im_z,
+            surfacecolor=buttom_img, 
+            cmin=0, 
+            cmax=255,
+            colorscale=colorscale,
+            showscale=False,
+            lighting_diffuse=1,
+            lighting_ambient=1,
+            lighting_fresnel=1,
+            lighting_roughness=1,
+            lighting_specular=0.5,
+        ),
+        row=row_loc, col=col_loc,)
+    fig.update_layout(
+        title_text='Track Restore Result',
+        height=350*row_num,
+        width=1000,
+        showlegend = False
+    )
+
+    fig.update_scenes(xaxis = dict(nticks=4,range=[0,400]),
+                      yaxis = dict(nticks=4,range=[0,300]),
+                      zaxis = dict(nticks=4,range=[0,24]),
+                        aspectratio=dict(x=1, y=0.75, z=0.75),
+                        
+                        camera=dict(
+                            up=dict(
+                                x=0,
+                                y=0,
+                                z=1
+                            ),
+                            eye=dict(
+                                x=0,
+                                y=-1,
+                                z=1,
+                            ),
+                        ),
+                        xaxis_title="X",
+                        yaxis_title="Y",
+                        zaxis_title="hour" ,
+                        )
+
+    fig.show()
+
 def Track3D_Origin(df_now,df_wifiPos):
+    x,y,z = GetOriginXYZ(df_now,df_wifiPos)
+    Track_3D(x,y,z)
+
+def GetOriginXYZ(df_now,df_wifiPos):
     z = []
     x = []
     y = []
@@ -453,9 +551,13 @@ def Track3D_Origin(df_now,df_wifiPos):
         z.append(row.t.hour+(row.t.minute/60))
         x.append(df_wifiPos[df_wifiPos.wifi == row.a].iloc[0].X)
         y.append(df_wifiPos[df_wifiPos.wifi == row.a].iloc[0].Y)
-    Track_3D(x,y,z)
+    return x,y,z
 
 def Track3D_Virtual(df_now,df_wifiPos):
+    x,y,z = GetVirtualXYZ(df_now,df_wifiPos)
+    Track_3D(x,y,z)
+
+def GetVirtualXYZ(df_now,df_wifiPos):
     z = []
     x = []
     y = []
@@ -463,7 +565,7 @@ def Track3D_Virtual(df_now,df_wifiPos):
         z.append(row.t.hour+(row.t.minute/60))
         x.append(df_wifiPos[df_wifiPos.wifi == row.a].iloc[0].restored_x)
         y.append(df_wifiPos[df_wifiPos.wifi == row.a].iloc[0].restored_y)
-    Track_3D(x,y,z)
+    return x,y,z
 
 def GetPath(start,end,df_path):
         for i,row in df_path.iterrows():
@@ -509,7 +611,6 @@ def Track3D_Restored(df_now,df_wifipos,df_path):
             _append_path(df_path,row_last.a,row.a,time_start,time_end)
             wifi_last = row.a
     Track_3D(x,y,z,marker_size=2,line_width=6)
-
 
 def _addTrackCount(track_list,track_count,track,add_num = 1):
         for i,t in enumerate(track_list):
