@@ -74,19 +74,21 @@ def Double_Axes_Line(df,xAxis_str,line1_str,line2_str,xAxes_name = "",line1_name
     fig.add_trace(
         go.Scatter(x = df[xAxis_str], y = df[line1_str],
                             mode='lines',
+                            name=line1_name,
                             line=dict(color=colors[0],width=line_size[0]),
                             ),
                             secondary_y = False)
     fig.add_trace(
         go.Scatter(x = df[xAxis_str], y = df[line2_str],
                             mode='lines',
+                            name=line2_name,
                             line=dict(color=colors[1],width=line_size[1]),
                             ),
                             secondary_y = True)
     if line1_name != "":
-        fig.update_yaxes(title_text="<b>%i</b> "%line1_name, secondary_y=False)
+        fig.update_yaxes(title_text=f"<b>{line1_name}</b> ", secondary_y=False)
     if line2_name != "":
-        fig.update_yaxes(title_text="<b>%i</b>"%line2_name, secondary_y=True)
+        fig.update_yaxes(title_text=f"<b>{line2_name}</b>", secondary_y=True)
     fig.update_layout(
         width = 800,
         xaxis=dict(
@@ -102,6 +104,7 @@ def Double_Axes_Line(df,xAxis_str,line1_str,line2_str,xAxes_name = "",line1_name
                 color='rgb(82, 82, 82)',
             ),
         ),
+        
     )
     if xAxes_name != "":
         fig.update_xaxes
@@ -368,7 +371,6 @@ def Boxes(list_tuple,box_title = ""):
         fig.update_layout(title_text=box_title)
     
     fig.show()
-
 
 def Track_3D(x,y,z,x_name = "",y_name = "",z_name = "",marker_size = 3,line_width = 3):
     fig = go.Figure()
@@ -727,4 +729,49 @@ def Track_2D(pass_path, pass_count=None, stay_pos=None, stay_count=None):
                 opacity=0.3)
     )
     fig.show()
+
+def Scatter_Matrix(df,dimentions,color = '',color_scale = 'Bluered'):
+    dim_dic_list = []
+    for di in dimentions:
+        dim_dic_list.append(
+            dict(
+                label=di,
+                values=df[di]
+            )
+        )
+    if color == '':
+        fig = go.Figure(data=go.Splom(
+                    dimensions=dim_dic_list,
+                    marker=dict(
+                        size=3,
+                        showscale=False,
+                        line_color='white',
+                        line_width=0.5,
+                        opacity = 0.4
+                    ),
+                    showupperhalf=False,
+                    ))
+    else:
+        fig = go.Figure(data=go.Splom(
+                    dimensions=dim_dic_list,
+                    marker=dict(
+                        color=df[color],
+                        size=3,
+                        showscale=False,
+                        line_color='white',
+                        line_width=0.5,
+                        colorscale=color_scale,
+                        opacity = 0.4
+                    ),
+                    showupperhalf=False,
+                    ))
+    fig.update_layout(
+        dragmode='select',
+        width=800,
+        height=800,
+         hovermode='closest',
+    )
+
+    fig.show()
+  
 

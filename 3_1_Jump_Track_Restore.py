@@ -194,12 +194,3 @@ with tqdm(total=len(mac_list),desc="清除漂移轨迹") as pbar:
 df = df_new
 df.to_csv(os.getcwd()+f"/wifi_track_data/dacang/track_data/dacang_track_data_3_final_{date}.csv",index=False)
 
-#---------清除一直在同一地方的mac----------
-
-# list_count = df.groupby(['m']).a.value_counts()
-# dd = list_count.to_frame().rename(columns={'a':'A'}).reset_index()
-# mac_Once = dd[~dd.duplicated('m', keep=False)].m.reset_index().drop('index',axis=1)
-# df = df.loc[~df.m.isin(mac_Once.m)]
-
-
-# df.to_csv(os.getcwd()+f"/wifi_track_data/dacang/track_data/dacang_track_data_3_final_deleteOnePlace_{date}.csv",index=False)
