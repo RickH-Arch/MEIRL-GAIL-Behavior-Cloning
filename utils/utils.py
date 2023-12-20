@@ -246,3 +246,51 @@ def Kmeans(df,col_names,cluster_num):
     X = np.array(DfToRowList(df,col_names))
     kmeans = KMeans(n_clusters=cluster_num,init="k-means++",max_iter=300, random_state=0).fit(X)
     return kmeans.labels_
+
+def _getPath(start,end,df_path):
+        for i,row in df_path.iterrows():
+            starts,destis = row.path.split('->')
+            starts = starts.split(':')
+            destis = destis.split(':')
+            if str(start) in starts and str(end) in destis:
+                return [x for x in row[1:] if str(x) != 'nan']
+        return None
+
+def GetPathPoints(df_now,df_wifipos,df_path):
+    '''
+    return all points of the incoming df_now's path
+    '''
+    def _append_pos(df_wifipos,tracker,time):
+        z.append(time)
+        x.append(df_wifipos[df_wifipos.wifi == tracker].iloc[0].restored_x)
+        y.append(df_wifipos[df_wifipos.wifi == tracker].iloc[0].restored_y)
+
+    def _append_path(df_path,start,end,start_time,end_time):
+        path_points = _getPath(start,end,df_path)
+        
+        if len(path_points) == 0:
+            return
+        length = len(path_points)
+        for i,point in enumerate(path_points):
+            z.append(start_time + (i+1)*(end_time-start_time)/(length+1))
+            xx,yy = point.split(':')
+            x.append(float(xx))
+            y.append(float(yy))
+
+    x = []
+    y = []
+    z = []
+    wifi_last = -1
+    for index,row in df_now.iterrows():
+        if index == 0:
+            wifi_last = row.a
+            continue  
+        if row.a == wifi_last:
+            _append_pos(df_wifipos,row.a,row.t.hour+(row.t.minute/60))
+        else:
+            row_last = df_now.iloc[index-1]
+            time_start = row_last.t.hour+(row_last.t.minute/60)
+            time_end = row.t.hour+(row.t.minute/60)
+            _append_path(df_path,row_last.a,row.a,time_start,time_end)
+            wifi_last = row.a
+    return x,y,z
