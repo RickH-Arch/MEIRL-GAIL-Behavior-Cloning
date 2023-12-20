@@ -9,6 +9,9 @@ import os
 from utils import utils
 from tqdm import tqdm
 import pandas as pd
+from datetime import datetime
+current_time = datetime.now()
+date = str(current_time.month)+str(current_time.day)
 
 
 img_path = os.getcwd()+'/wifi_track_data/dacang/imgs/roads.png'
@@ -627,10 +630,13 @@ def Track2D_Restored(df,df_wifipos,df_path,show_freq = True,save = ''):
         _getPathAndStay(df_now,df_wifipos,df_path,pass_path,pass_count,stay_pos,stay_count)
     
     if save != '':
-        np.save(f'wifi_track_data/dacang/track_data/{save}_pass_path.npy',pass_path)
-        np.save(f'wifi_track_data/dacang/track_data/{save}_pass_count.npy',pass_count)
-        np.save(f'wifi_track_data/dacang/track_data/{save}_stay_pos.npy',stay_pos)
-        np.save(f'wifi_track_data/dacang/track_data/{save}_stay_count.npy',stay_count)
+        folder_path = os.path.join('wifi_track_data/dacang/track_data/',str(date)+f'/{save}')
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+        np.save(folder_path + f'/{save}_pass_path.npy',pass_path)
+        np.save(folder_path + f'/{save}_pass_count.npy',pass_count)
+        np.save(folder_path + f'/{save}_stay_pos.npy',stay_pos)
+        np.save(folder_path + f'/{save}_stay_count.npy',stay_count)
     
     if show_freq:
         Track_2D(pass_path,pass_count,stay_pos,stay_count)
