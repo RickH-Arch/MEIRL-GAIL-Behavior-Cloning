@@ -8,6 +8,7 @@ from PIL import Image
 import os
 from utils import utils
 from tqdm import tqdm
+import pandas as pd
 
 
 img_path = os.getcwd()+'/wifi_track_data/dacang/imgs/roads.png'
@@ -644,14 +645,14 @@ def _getPathAndStay(df_now,df_wifipos,df_path,pass_path,pass_count,stay_pos,stay
                 if i == 0:
                     last_loc = loc
                     continue
-                path = (last_loc,loc)
+                path = [last_loc,loc]
                 if _addTrackCount(pass_path,pass_count,path) == False:
                     pass_path.append(path)
                     pass_count.append(1)
                 last_loc = loc
             wifi_last = row.a
 
-def Track2D_Restored(df,df_wifipos,df_path,show_freq = True):
+def Track2D_Restored(df,df_wifipos,df_path,show_freq = True,save = ''):
     mac_list = df.m.unique()
 
     pass_path= [] # [tuple1([x1,y1],[x2,y2]),tuple2([x1,y1],[x2,y2])...]"
@@ -663,6 +664,11 @@ def Track2D_Restored(df,df_wifipos,df_path,show_freq = True):
         df_now = utils.GetDfNow(df,mac)
         _getPathAndStay(df_now,df_wifipos,df_path,pass_path,pass_count,stay_pos,stay_count)
     
+    if save != '':
+        np.save(f'wifi_track_data/dacang/track_data/{save}_pass_path.npy',pass_path)
+        np.save(f'wifi_track_data/dacang/track_data/{save}_pass_count.npy',pass_count)
+        np.save(f'wifi_track_data/dacang/track_data/{save}_stay_pos.npy',stay_pos)
+        np.save(f'wifi_track_data/dacang/track_data/{save}_stay_count.npy',stay_count)
     
     if show_freq:
         Track_2D(pass_path,pass_count,stay_pos,stay_count)
