@@ -570,49 +570,10 @@ def GetVirtualXYZ(df_now,df_wifiPos):
         y.append(df_wifiPos[df_wifiPos.wifi == row.a].iloc[0].restored_y)
     return x,y,z
 
-def GetPath(start,end,df_path):
-        for i,row in df_path.iterrows():
-            starts,destis = row.path.split('->')
-            starts = starts.split(':')
-            destis = destis.split(':')
-            if str(start) in starts and str(end) in destis:
-                return [x for x in row[1:] if str(x) != 'nan']
-        return None
+
 
 def Track3D_Restored(df_now,df_wifipos,df_path):
-    def _append_pos(df_wifipos,tracker,time):
-        z.append(time)
-        x.append(df_wifipos[df_wifipos.wifi == tracker].iloc[0].restored_x)
-        y.append(df_wifipos[df_wifipos.wifi == tracker].iloc[0].restored_y)
-
-    def _append_path(df_path,start,end,start_time,end_time):
-        path_points = GetPath(start,end,df_path)
-        
-        if len(path_points) == 0:
-            return
-        length = len(path_points)
-        for i,point in enumerate(path_points):
-            z.append(start_time + (i+1)*(end_time-start_time)/(length+1))
-            xx,yy = point.split(':')
-            x.append(float(xx))
-            y.append(float(yy))
-
-    x = []
-    y = []
-    z = []
-    wifi_last = -1
-    for index,row in df_now.iterrows():
-        if index == 0:
-            wifi_last = row.a
-            continue  
-        if row.a == wifi_last:
-            _append_pos(df_wifipos,row.a,row.t.hour+(row.t.minute/60))
-        else:
-            row_last = df_now.iloc[index-1]
-            time_start = row_last.t.hour+(row_last.t.minute/60)
-            time_end = row.t.hour+(row.t.minute/60)
-            _append_path(df_path,row_last.a,row.a,time_start,time_end)
-            wifi_last = row.a
+    x,y,z = utils.GetPathPoints(df_now,df_wifipos,df_path)
     Track_3D(x,y,z,marker_size=2,line_width=6)
 
 def _addTrackCount(track_list,track_count,track,add_num = 1):
@@ -637,7 +598,7 @@ def _getPathAndStay(df_now,df_wifipos,df_path,pass_path,pass_count,stay_pos,stay
                 stay_count.append(last_time)
         #place changed
         else:
-            paths = GetPath(wifi_last,row.a,df_path)
+            paths = utils._getPath(wifi_last,row.a,df_path)
             last_loc = 0
             for i in range(len(paths)):
                 loc_str = paths[i].split(':')
@@ -661,6 +622,7 @@ def Track2D_Restored(df,df_wifipos,df_path,show_freq = True,save = ''):
     stay_count = []
     
     for mac in tqdm(mac_list):
+
         df_now = utils.GetDfNow(df,mac)
         _getPathAndStay(df_now,df_wifipos,df_path,pass_path,pass_count,stay_pos,stay_count)
     
