@@ -170,7 +170,7 @@ with tqdm(total=len(mac_list),desc="删除重复探针") as pbar:
         if len(df_now)>2:
             df_now = utils.DeleteRepeatTrack(df_now)
         df_new = pd.concat([df_new,df_now],axis=0)
-df_new.to_csv(os.getcwd()+f"/wifi_track_data/dacang/track_data/dacang_track_data_3_repeateDeleted_{date}.csv",index=False)
+df_new.to_csv(os.getcwd()+f"/wifi_track_data/dacang/track_data/processing_data/dacang_track_data_3_repeateDeleted_{date}.csv",index=False)
 df = df_new
 print(f"当前数据量:{len(df)}")
 
