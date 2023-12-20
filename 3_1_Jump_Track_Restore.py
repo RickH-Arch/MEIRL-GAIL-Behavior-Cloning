@@ -2,17 +2,13 @@ import pandas as pd
 import numpy as np
 import os
 from tqdm import tqdm
-
 from utils import utils,TrackCleaner
-from utils.BoxFeatures import BoxFeature
-
 import warnings
 warnings.filterwarnings('ignore')
 
 from datetime import datetime
 current_time = datetime.now()
 date = str(current_time.month)+str(current_time.day)
-import time
 
 track_data_path = "wifi_track_data/dacang/track_data/dacang_track_data_2_1217.csv"
 #track_data_path = r"wifi_track_data\dacang\track_data\dacang_track_data_3_epoch6_1217.csv"
