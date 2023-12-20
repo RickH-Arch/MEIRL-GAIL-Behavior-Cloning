@@ -28,7 +28,9 @@ def JumpTrackRestore(df_now,
 def JumpTrackRestoreWithTrackList(df_now,df_wifipos,track_sets_enforce,track_sets):
     if len(track_sets_enforce)>0:
         df_now = ReplaceJumpTrack(df_now,df_wifipos,track_sets_enforce,enforce=True)
-    return ReplaceJumpTrack(df_now,df_wifipos,track_sets,enforce=False)
+    if len(track_sets)>0:
+        df_now = ReplaceJumpTrack(df_now,df_wifipos,track_sets,enforce=False)
+    return df_now
 
 
 def ReplaceJumpTrack(df_now,df_wifipos,track_sets,enforce = False):
@@ -103,7 +105,7 @@ def ReplaceJumpTrack(df_now,df_wifipos,track_sets,enforce = False):
         for i in range(len(_STATUS_)):
             if _STATUS_[i] == 0:
                 continue
-            if row.a in track_sets[i]:
+            if df_now.iloc[row_index].a in track_sets[i]:
                 if _STATUS_[i] == max(_STATUS_):
                     df_now.at[row_index,'a'] = virtual_track_list[i]
                     return
@@ -165,6 +167,7 @@ def ReplaceJumpTrack(df_now,df_wifipos,track_sets,enforce = False):
             df_now.at[key,'a'] = value
 
     return utils.DeleteRepeatTrack(df_now)
+    
 
 def AddTrackCoupleToDf(df,df_wifipos,wifi_a,wifi_b,switch_t,switch_speed):
     '''
@@ -361,6 +364,7 @@ def GenerateVirtualTrackerReturnTrackList(df,
     return[0]:总共新创建的探针列表
     return[1]:每个mac下创建虚拟探针的父探针set集合
     '''
+    df = df.copy()
     df_wifiposNew = df_wifipos.copy()
     mac_list = df.m.unique()
     
