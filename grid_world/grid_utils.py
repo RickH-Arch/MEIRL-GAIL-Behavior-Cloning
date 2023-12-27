@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from utils import utils
 import random
+import math
 
 
 def DrawPathOnGrid(grid,point1, point2):
@@ -88,3 +89,15 @@ def StatesToStateActionPairs(states):
                 pairs.append([states[i],4])
         
     return pairs
+
+def GetFeature(env_array,i,j):
+    feature = 0
+    for row in range(0,env_array.shape[0]):
+        for col in range(0,env_array.shape[1]):
+            if env_array[row,col] != 0:
+                dis = (row-i)**2+(col-j)**2
+                if dis == 0:
+                    dis = 0.5
+                dis = math.sqrt(dis)
+                feature += env_array[row,col]/dis
+    return feature
