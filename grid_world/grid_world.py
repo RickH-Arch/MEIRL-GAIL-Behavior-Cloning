@@ -6,87 +6,57 @@ from grid_world import grid_utils,grid_plot
 import math
 from datetime import datetime
 import pickle
+import os
+from datetime import datetime
+current_time = datetime.now()
+date = str(current_time.month)+str(current_time.day)
 
 
 class GridWorld:
     '''
-    class to initialize grid world, record active state, convert path to state action pairs, parce enviroment factors, etc.
+    class to initialize grid world,
     actions: 0:stay,1:up,2:down,3:left,4:right
     '''
-    def __init__(self, df_wifipos,df_path,width = 100,height = 75) -> None:
+    def __init__(self,
+                 count_grid_filePath,
+                 environments_folderPath,
+                 features_folderPath,
+                expert_traj_filePath,
+                 width = 100,height = 75,
+                 trans_prob = 0.9) -> None:
         self.width = width
         self.height = height
-        self.empty_grid = np.zeros((height,width))
-        self.count_grid = np.zeros((height,width))
-        self.freq_grid = np.zeros((height,width))
-        self.df_wifipos = df_wifipos
-        self.df_path = df_path
+        
+        self.trans_prob = trans_prob
+        
+        self.states = self.GetAllStates()
+        self.n_states = len(self.states)
+        self.n_actions = 5
+        self.actions = [0,1,2,3,4]
+        self.neighbors = [0,width,-width,-1,1]
+        
+        self.state_envs = {}
+        self.state_features = {}
 
+        self.count_grid = np.load(count_grid_filePath)#每个网格被经过的次数
+        self.p_grid = self.count_grid/np.sum(self.count_grid)#每个网格被经过的概率
+        #环境，状态-环境，环境列表
+        self.envs,self.states_envs,self.envs_list = self.ReadEnvironments(environments_folderPath)
+        #特征，状态-特征，特征列表
+        self.features,self.states_features,self.features_list = self.ReadFeatures(features_folderPath)
+        #专家轨迹
+        self.df_expert_trajs = self.ReadExpertTrajs(expert_traj_filePath)
+        self.expert_trajs = self.df_expert_trajs['trajs'].tolist()
+
+        #transition probability
+        self.dynamics = self.GetTransitionMat()
+
+        #get time
         current_time = datetime.now()
         self.date = str(current_time.month)+str(current_time.day)
-        
-    def RecordPathCount(self,df,scale = 1):
-        mac_list = df.m.unique()
-        for m in tqdm(mac_list):
-            df_now = utils.GetDfNow(df,m)
-            x,y,z = utils.GetPathPointsWithUniformDivide(df_now,self.df_wifipos,self.df_path)
-            for i in range(len(x)-1):
-                point1 = (math.floor(x[i]*scale),math.floor(y[i]*scale))
-                point2 = (math.floor(x[i+1]*scale),math.floor(y[i+1]*scale))
-                self.count_grid= grid_utils.DrawPathOnGrid(self.count_grid,point1,point2)
-        
-        self.SavePathCount(f'wifi_track_data/dacang/grid_data/count_grid_{self.date}.npy')
 
-    def PathToStateActionPairs(self,df,scale = 1):
-        mac_list = df.m.unique()
-        state_list = []
-        for m in tqdm(mac_list):
-            state = []
-            df_now = utils.GetDfNow(df,m)
-            x,y,z = utils.GetPathPointsWithUniformDivide(df_now,self.df_wifipos,self.df_path)
-            for i in range(len(x)-1):
-                point1 = (math.floor(x[i]*scale),math.floor(y[i]*scale))
-                point2 = (math.floor(x[i+1]*scale),math.floor(y[i+1]*scale))
-                state.extend(grid_utils.GetPathCorList(self.count_grid,point1,point2))
-            state_list.append(state)
-        print("Converting to state action pairs...")
-        pairs_list = []
-        for i in range(len(state_list)):
-            states = state_list[i]
-            pairs = grid_utils.StatesToStateActionPairs(states)
-            for pair in pairs:
-                pair[0] = self.CoordToState(pair[0])
-            pairs_list.append(pairs)
-        pairs_dict = dict(zip(mac_list, pairs_list))
-        df = pd.DataFrame({"m":mac_list,'trajs':pairs_list})
-        df.to_csv(f'wifi_track_data/dacang/track_data/trajs_{self.date}.csv',index=False)
-        return df
-
+#------------------------------------Get Method------------------------------------------
         
-        
-    def ReadPathCount(self,path):
-        self.count_grid = np.load(path)
-
-    def SavePathCount(self,path):
-        np.save(path,self.count_grid)
-
-    def GetFreqGrid(self):
-        self.freq_grid = self.count_grid/np.sum(self.count_grid)
-        return self.freq_grid
-    
-    def GetActiveGrid(self,threshold = 0):
-        self.active_grid = (self.count_grid>threshold).astype(int)
-        return self.active_grid
-    
-    def CoordToState(self,coord):
-        x,y = coord
-        return int(y*self.width+x)
-    
-    def StateToCoord(self,state):
-        x = state%self.width
-        y = state//self.width
-        return (x,y)
-    
     def GetAllActiveStates(self):
         states = []
         for i in range(self.height):
@@ -102,13 +72,146 @@ class GridWorld:
                 states.append(self.CoordToState([j,i]))
         return states
     
+    def GetFeaturesFromGivenState(self,state):
+        return self.states_features[state]
+    
+    def GetTransitionMat(self):
+        '''
+        get transition dynamics of the gridworld
+
+        return:
+            P_a         N_STATESxN_STATESxN_ACTIONS transition probabilities matrix - 
+                        P_a[s0, s1, a] is the transition prob of 
+                        landing at state s1 when taking action 
+                        a at state s0
+        '''
+
+        P_a = np.zeros((self.n_states,self.n_states,self.n_actions))
+        for state in self.states:
+            for a in self.actions:
+                probs = self.GetTransitionStatesAndProbs(state,a)
+                for next_s,prob in probs:
+                    P_a[state,next_s,a] = prob
+        return P_a
+
+    def GetTransitionStatesAndProbs(self,state,action):
+        if self.trans_prob == 1:
+            inc = self.neighbors[action]
+            next_s = state + inc
+            if next_s not in self.states:
+                return [(state,1)]
+            else:
+                return[(next_s,1)]
+            
+        else:
+            mov_probs = np.zeros([self.n_actions])
+            mov_probs += (1-self.trans_prob)/(self.n_actions-1)
+            mov_probs[action] = self.trans_prob
+
+            for a in self.actions:
+                inc = self.neighbors[a]
+                next_s = state + inc
+                if next_s not in self.states:
+                    mov_probs[-1] += mov_probs[a]
+                    mov_probs[a] = 0
+
+            res = []
+            for a in self.actions:
+                if mov_probs[a] != 0:
+                    inc = self.neighbors[a]
+                    next_s = state + inc
+                    res.append((next_s,mov_probs[a]))
+            return res
+
+
+#------------------------------------Init Function------------------------------------------ 
+    
+    def ReadEnvironments(self,folder_path):
+        environments = {}
+        file_names = os.listdir(folder_path)
+        for file_name in file_names:
+            env_array = np.load(os.path.join(folder_path,file_name))
+            environments.update({file_name.split("_")[0]:env_array})
+        states_envs = {}
+        for state in self.states:
+            states_envs.update({state:self._loadStateEnvs(state,environments)})
+        environment_list = list(environments.keys())
+        return environments,states_envs,environment_list
+
+    def ReadFeatures(self,folder_path):
+        features = {}
+        file_names = os.listdir(folder_path)
+        for file_name in file_names:
+            feature_array = np.load(os.path.join(folder_path,file_name))
+            features.update({file_name.split("_")[0]:feature_array})
+        states_features = {}
+        for state in self.states:
+            states_features.update({state:self._loadStateFeatures(state,features)})
+        feature_list = list(features.keys())
+        return features,states_features,feature_list
+
+    
+
+
+    def _readEnvironment(self,env_name,file_path):
+        env_array = np.load(file_path)
+        self.environments.update({env_name:env_array})
+        return env_array
+    
+    def _readFeature(self,feature_name,file_path):
+        feature_array = np.load(file_path)
+        self.features.update({feature_name:feature_array})
+        return feature_array
+    
+    def _loadStateEnvs(self,state,environments):
+        x,y = self.StateToCoord(state)
+        envs = []
+        for env in environments.values():
+            envs.append(env[y,x])
+        return envs
+    
+    def _loadStateFeatures(self,state,features):
+        x,y = self.StateToCoord(state)
+        fs = []
+        for feature in features.values():
+            fs.append(feature[y,x])
+        return fs
+    
+    def ReadExpertTrajs(self,file_path):
+        df_expert_trajs = pd.read_csv(file_path)
+        df_expert_trajs['trajs'] = df_expert_trajs['trajs'].apply(lambda x:eval(x))
+        return df_expert_trajs
+    
+#------------------------------------utils method------------------------------------------
+    def CoordToState(self,coord):
+        x,y = coord
+        return int(y*self.width+x)
+    
+    def StateToCoord(self,state):
+        x = state%self.width
+        y = state//self.width
+        return (x,y)
+    
+    def GetActiveGrid(self,threshold = 0):
+        self.active_grid = (self.count_grid>threshold).astype(int)
+        return self.active_grid
+
+#------------------------------------Plot------------------------------------------
+    
+    def ShowEnvironments(self):
+        grid_plot.ShowGridWorlds(self.envs)
+    
+    def ShowFeatures(self):
+        grid_plot.ShowGridWorlds(self.features)
+
     def ShowGridWorld_Count(self):
         grid_plot.ShowGridWorld(self.count_grid)
 
     def ShowGridWorld_Freq(self):
-        grid_plot.ShowGridWorld(self.freq_grid)
+        grid_plot.ShowGridWorld(self.p_grid)
 
     def ShowGridWorld_Activated(self):
         grid_plot.ShowGridWorld(self.GetActiveGrid())
 
+    
     

@@ -27,6 +27,11 @@ def Normalize_df(df_in,cols = [],mul_index = 10):
     
     return df
 
+def Normalize_2DArr(arr):
+    f = arr.flatten()
+    f = Normalize_arr(f)
+    return f.reshape(arr.shape[0],arr.shape[1])
+
 def _cut_Data_By_Thre(df,cut_list,cut_thre,cut_col_name,cut_mode):
     df_result = df.copy()
     for index,row in df_result.iterrows():
