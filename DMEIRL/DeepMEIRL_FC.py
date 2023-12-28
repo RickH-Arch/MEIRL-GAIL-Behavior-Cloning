@@ -5,6 +5,9 @@ from tqdm import tqdm
 from DMEIRL.value_iteration import value_iteration
 import numpy as np
 
+from torch.cuda.amp import autocast, GradScaler
+scaler = GradScaler()
+
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class DeepMEIRL_FC(nn.Module):
@@ -19,7 +22,7 @@ class DeepMEIRL_FC(nn.Module):
         self.net = []
         for l in layers:
             self.net.append(nn.Linear(n_input,l))
-            self.net.append(nn.ReLU())
+            self.net.append(nn.ReLU(inplace=True))
             n_input = l
         self.net.append(nn.Linear(n_input,1))
         self.net.append(nn.Tanh())
@@ -53,17 +56,21 @@ class DMEIRL:
         svf = self.StateVisitationFrequency()
 
         for epoch in tqdm(range(n_epochs)):
-            rewards = self.model(self.features).flatten()
-            if save_rewards:
-                self.rewards.append(rewards.detach().cpu().numpy())
+            with autocast():
+                rewards = self.model(self.features).flatten()
+                if save_rewards:
+                    self.rewards.append(rewards.detach().cpu().numpy())
 
-            policy = value_iteration(0.001,self.world,rewards,self.discount)
-            exp_svf = self.Expected_StateVisitationFrequency(policy)
-            r_grad = svf - exp_svf
+                policy = value_iteration(0.001,self.world,rewards,self.discount)
+                exp_svf = self.Expected_StateVisitationFrequency(policy)
+                r_grad = svf - exp_svf
 
             self.optimizer.zero_grad()
-            rewards.backward(-r_grad)
-            self.optimizer.step()
+            #rewards.backward(-r_grad)
+            scaler.scale(rewards).backward(-r_grad)
+            #self.optimizer.step()
+            scaler.step(self.optimizer)
+            scaler.update()
 
         with torch.no_grad():
             rewards = self.model.forward(self.features)
@@ -81,7 +88,7 @@ class DMEIRL:
         prob_initial_state = torch.zeros(self.world.n_states,dtype=torch.float32).to(device)
         for traj in self.trajs:
             prob_initial_state[traj[0][0]] += 1
-        prob_initial_state = prob_initial_state/self.trajs.shape[0]
+        prob_initial_state = prob_initial_state/self.world.traj_avg_length
 
         #Compute 𝜇
         mu = prob_initial_state.repeat(self.world.traj_avg_length,1)
