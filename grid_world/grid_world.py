@@ -35,18 +35,19 @@ class GridWorld:
         self.actions = [0,1,2,3,4]
         self.neighbors = [0,width,-width,-1,1]
         
-        self.state_envs = {}
-        self.state_features = {}
-
         self.count_grid = np.load(count_grid_filePath)#每个网格被经过的次数
         self.p_grid = self.count_grid/np.sum(self.count_grid)#每个网格被经过的概率
         #环境，状态-环境，环境列表
         self.envs,self.states_envs,self.envs_list = self.ReadEnvironments(environments_folderPath)
         #特征，状态-特征，特征列表
         self.features,self.states_features,self.features_list = self.ReadFeatures(features_folderPath)
+        self.features_arr = np.array(list(self.states_features.values()))
         #专家轨迹
         self.df_expert_trajs = self.ReadExpertTrajs(expert_traj_filePath)
         self.expert_trajs = self.df_expert_trajs['trajs'].tolist()
+        self.traj_avg_length = np.mean(self.df_expert_trajs['trajs'].apply(lambda x:len(x)))
+
+        
 
         #transition probability
         self.dynamics = self.GetTransitionMat()
@@ -86,12 +87,12 @@ class GridWorld:
                         a at state s0
         '''
 
-        P_a = np.zeros((self.n_states,self.n_states,self.n_actions))
+        P_a = np.zeros((self.n_states,self.n_actions,self.n_states))
         for state in self.states:
             for a in self.actions:
                 probs = self.GetTransitionStatesAndProbs(state,a)
                 for next_s,prob in probs:
-                    P_a[state,next_s,a] = prob
+                    P_a[state,a,next_s] = prob
         return P_a
 
     def GetTransitionStatesAndProbs(self,state,action):
