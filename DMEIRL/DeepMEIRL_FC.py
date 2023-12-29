@@ -62,6 +62,7 @@ class DMEIRL:
     def train(self,n_epochs, save_rewards = True):
         self.rewards = []
         svf = self.StateVisitationFrequency()
+        compare = nn.MSELoss()
 
         for i in tqdm(range(n_epochs)):
             print("=============================epoch{}=============================".format(i+1))
@@ -73,6 +74,8 @@ class DMEIRL:
                     if os.path.exists(last_file):
                         os.remove(last_file)
                     np.save(f"wifi_track_data/dacang/train_data/rewards_{self.model.name}_epoch{i+1}_{date}.csv" ,self.rewards)
+                if i > 0 :
+                    print(f"reward compare: {compare(self.rewards[-1],self.rewards[-2])}")
                 print(f"epoch{i+1} policy value_iteration start")
                 policy = value_iteration(0.001,self.world,rewards.detach(),self.discount)
                 exp_svf = self.Expected_StateVisitationFrequency(policy)
