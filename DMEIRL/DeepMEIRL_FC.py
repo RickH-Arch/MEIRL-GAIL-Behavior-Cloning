@@ -74,7 +74,7 @@ class DMEIRL:
                         os.remove(last_file)
                     np.save(f"wifi_track_data/dacang/train_data/rewards_{self.model.name}_epoch{i+1}_{date}.csv" ,self.rewards)
                 print(f"epoch{i+1} policy value_iteration start")
-                policy = value_iteration(0.05,self.world,rewards.detach(),self.discount)
+                policy = value_iteration(0.001,self.world,rewards.detach(),self.discount)
                 exp_svf = self.Expected_StateVisitationFrequency(policy)
                 r_grad = svf - exp_svf
 

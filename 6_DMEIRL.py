@@ -1,13 +1,3 @@
-import pandas as pd
-import numpy as np
-import os
-import datetime
-import time
-from tqdm import tqdm
-
-import math
-
-from utils import utils,myplot
 from grid_world.grid_world import GridWorld
 from DMEIRL.DeepMEIRL_FC import DMEIRL
 
@@ -30,4 +20,4 @@ dme = DMEIRL(world,layers=(40,30))
 
 #------------------------------------Train------------------------------------------
 
-dme.train(n_epochs=3000)
+dme.train(n_epochs=1000)
