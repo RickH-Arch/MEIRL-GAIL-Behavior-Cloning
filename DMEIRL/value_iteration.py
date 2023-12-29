@@ -10,11 +10,11 @@ def value_iteration(threshold, world, rewards, discount = 0.01):
         while delta > threshold:
             delta = 0
             for s in world.states:
-                max_v = torch.tensor([-float('inf')]).to(device)
+                max_v = torch.tensor([-float('inf')],dtype=torch.float32).to(device)
                 for a in world.actions:
                     probs = torch.from_numpy(world.dynamics[:,a,s]).float().to(device)
                     max_v = torch.maximum(max_v,torch.dot(probs,rewards+discount*V))
-                delta = max(delta,torch.abs(max_v-V[s]).detach().cpu().numpy())
+                delta = max(delta,torch.abs(V[s] - max_v).detach().cpu().numpy())
                 V[s] = max_v
             print(f"delta: {delta}")
         print("value_iteration done, computing policy...")
