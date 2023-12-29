@@ -45,7 +45,7 @@ class GridWorld:
         #专家轨迹
         self.df_expert_trajs = self.ReadExpertTrajs(expert_traj_filePath)
         self.expert_trajs = self.df_expert_trajs['trajs'].tolist()
-        self.traj_avg_length = np.mean(self.df_expert_trajs['trajs'].apply(lambda x:len(x)))
+        self.traj_avg_length = int(np.mean(self.df_expert_trajs['trajs'].apply(lambda x:len(x))))
 
         
 
