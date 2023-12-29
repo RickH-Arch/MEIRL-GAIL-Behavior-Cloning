@@ -44,7 +44,7 @@ class DeepMEIRL_FC(nn.Module):
         return out
     
 class DMEIRL:
-    def __init__(self,world,layers = (50,30),discount = 0.9,load = ""):
+    def __init__(self,world,layers = (50,30),discount = 0.9,load = "",lr = 0.001,weight_decay = 0.5):
         self.world = world
         self.trajs = world.expert_trajs
         self.features = torch.from_numpy(world.features_arr).float().to(device)
@@ -53,6 +53,7 @@ class DMEIRL:
 
         self.model = DeepMEIRL_FC(self.features.shape[1],layers = layers)
         self.model = self.model.to(device)
+        self.optimizer = optim.Adam(self.model.parameters(),lr=lr,weight_decay=weight_decay)#momentum 动量,weight_decay = l2(权值衰减)
 
         if load != "":
             self.model.load_state_dict(torch.load(load))
@@ -66,27 +67,25 @@ class DMEIRL:
 
         for i in tqdm(range(n_epochs)):
             print("=============================epoch{}=============================".format(i+1))
-            with autocast():
-                rewards = self.model(self.features).flatten()
-                if save_rewards:
-                    self.rewards.append(rewards.detach().cpu().numpy())
-                    last_file = f"wifi_track_data/dacang/train_data/rewards_{self.model.name}_epoch{i}_{date}.csv"
-                    if os.path.exists(last_file):
-                        os.remove(last_file)
-                    np.save(f"wifi_track_data/dacang/train_data/rewards_{self.model.name}_epoch{i+1}_{date}.csv" ,self.rewards)
-                if i > 0 :
-                    print(f"reward compare: {compare(self.rewards[-1],self.rewards[-2])}")
-                print(f"epoch{i+1} policy value_iteration start")
-                policy = value_iteration(0.001,self.world,rewards.detach(),self.discount)
-                exp_svf = self.Expected_StateVisitationFrequency(policy)
-                r_grad = svf - exp_svf
+            
+            rewards = self.model(self.features).flatten()
+            if save_rewards:
+                self.rewards.append(rewards.detach().cpu().numpy())
+                last_file = f"wifi_track_data/dacang/train_data/rewards_{self.model.name}_epoch{i}_{date}.csv"
+                if os.path.exists(last_file):
+                    os.remove(last_file)
+                np.save(f"wifi_track_data/dacang/train_data/rewards_{self.model.name}_epoch{i+1}_{date}.csv" ,self.rewards)
+            if i > 0 :
+                print(f"reward compare: {compare(torch.from_numpy(self.rewards[-1]).float(),torch.from_numpy(self.rewards[-2]).float())}")
+            print(f"epoch{i+1} policy value_iteration start")
+            policy = value_iteration(0.05,self.world,rewards.detach(),self.discount)
+            exp_svf = self.Expected_StateVisitationFrequency(policy)
+            r_grad = svf - exp_svf
 
             self.optimizer.zero_grad()
-            #rewards.backward(-r_grad)
-            scaler.scale(rewards).backward(-r_grad)
-            #self.optimizer.step()
-            scaler.step(self.optimizer)
-            scaler.update()
+            rewards.backward(-r_grad)
+            self.optimizer.step()
+            
             print(f"epoch{i+1} policy value_iteration end")
 
         with torch.no_grad():
