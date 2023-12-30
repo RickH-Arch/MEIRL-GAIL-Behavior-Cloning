@@ -6,14 +6,21 @@ from DMEIRL.value_iteration import value_iteration
 import numpy as np
 import os
 
-from torch.cuda.amp import autocast, GradScaler
-scaler = GradScaler()
+# from torch.cuda.amp import autocast, GradScaler
+# scaler = GradScaler()
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 from datetime import datetime
 current_time = datetime.now()
 date = str(current_time.month)+str(current_time.day)
+
+seed = 60
+torch.manual_seed(seed)  # 为CPU设置随机种子
+np.random.seed(seed)  # Numpy module.
+if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+
 
 class DeepMEIRL_FC(nn.Module):
     def __init__(self,n_input,lr = 0.001, layers = (400,300), l2=0.5, name='deep_irl_fc') -> None:
@@ -44,7 +51,7 @@ class DeepMEIRL_FC(nn.Module):
         return out
     
 class DMEIRL:
-    def __init__(self,world,layers = (50,30),discount = 0.9,load = "",lr = 0.001,weight_decay = 0.5):
+    def __init__(self,world,layers = (50,30),discount = 0.9,load = "",lr = 0.001,weight_decay = 1):
         self.world = world
         self.trajs = world.expert_trajs
         self.features = torch.from_numpy(world.features_arr).float().to(device)
@@ -71,27 +78,37 @@ class DMEIRL:
             rewards = self.model(self.features).flatten()
             if save_rewards:
                 self.rewards.append(rewards.detach().cpu().numpy())
-                last_file = f"wifi_track_data/dacang/train_data/rewards_{self.model.name}_epoch{i}_{date}.csv"
+                last_file = f"wifi_track_data/dacang/train_data/rewards_{self.model.name}_epoch{i}_{date}.npy"
                 if os.path.exists(last_file):
                     os.remove(last_file)
-                np.save(f"wifi_track_data/dacang/train_data/rewards_{self.model.name}_epoch{i+1}_{date}.csv" ,self.rewards)
+                np.save(f"wifi_track_data/dacang/train_data/rewards_{self.model.name}_epoch{i+1}_{date}.npy" ,self.rewards)
             if i > 0 :
-                print(f"reward compare: {compare(torch.from_numpy(self.rewards[-1]).float(),torch.from_numpy(self.rewards[-2]).float())}")
+                with torch.no_grad():
+                    com = compare(torch.from_numpy(self.rewards[-1]).float(),torch.from_numpy(self.rewards[-2]).float())
+                    print(f"=====reward compare: {com*100000}=====")
+            
             print(f"epoch{i+1} policy value_iteration start")
-            policy = value_iteration(0.05,self.world,rewards.detach(),self.discount)
+            policy = value_iteration(0.001,self.world,rewards.detach(),self.discount)
             exp_svf = self.Expected_StateVisitationFrequency(policy)
             r_grad = svf - exp_svf
 
             self.optimizer.zero_grad()
             rewards.backward(-r_grad)
+            total_norm = nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=15, norm_type=2)
+            print("total_norm:",total_norm)
             self.optimizer.step()
+
+            last_model = f"wifi_track_data/dacang/train_data/model_{self.model.name}_epochs{i}_{date}.pth"
+            if os.path.exists(last_model):
+                os.remove(last_model)
+            torch.save(self.model.state_dict(),f"wifi_track_data/dacang/train_data/model_{self.model.name}_epochs{i+1}_{date}.pth")
             
             print(f"epoch{i+1} policy value_iteration end")
 
         with torch.no_grad():
             rewards = self.model.forward(self.features).flatten()
 
-        torch.save(self.model.state_dict(),f"wifi_track_data/dacang/train_data/{self.model.name}_nEpochs{n_epochs}_{date}.pth")
+        
         return rewards
 
     def StateVisitationFrequency(self):
