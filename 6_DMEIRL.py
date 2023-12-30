@@ -20,4 +20,4 @@ dme = DMEIRL(world,layers=(40,30))
 
 #------------------------------------Train------------------------------------------
 
-dme.train(n_epochs=1000)
+dme.train(n_epochs=5000)
