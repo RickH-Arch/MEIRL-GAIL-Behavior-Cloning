@@ -29,10 +29,10 @@ class DataParser:
         self.features = {}
         self.environments = {}
 
-        self.states = self.GetAllStates()
-        self.n_states = len(self.states)
+        # self.states = self.GetAllStates()
+        # self.n_states = len(self.states)
 
-        self.n_actions = 5
+        # self.n_actions = 5
 
         self.state_envs = {}
         self.state_features = {}
