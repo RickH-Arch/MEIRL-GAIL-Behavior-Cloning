@@ -101,3 +101,13 @@ def GetFeature(env_array,i,j):
                 dis = math.sqrt(dis)
                 feature += env_array[row,col]/dis
     return feature
+
+def CoordToState(coord,width):
+        x,y = coord
+        return int(y*width+x)
+    
+def StateToCoord(state,width):
+    x = state%width
+    y = state//width
+    return (x,y)
+    

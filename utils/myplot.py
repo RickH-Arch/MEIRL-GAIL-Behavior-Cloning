@@ -367,7 +367,7 @@ def Boxes(list_tuple,box_title = ""):
         row=1, col=i+1
     )
     fig.update_traces(boxpoints='all', jitter=.2)
-    fig.update_layout(height=400, width=300*len(list_tuple))
+    fig.update_layout(height=400, width=150*len(list_tuple))
     
     if box_title == "":
         fig.update_layout(title_text="Box Plot")
@@ -704,6 +704,15 @@ def Track_2D(pass_path, pass_count=None, stay_pos=None, stay_count=None):
     )
     fig.show()
 
+def Scatter_Matrix_test(df,dimentions,color = '',color_scale = 'Bluered'):
+    fig = px.scatter_matrix(df,dimensions=dimentions,
+                            color=color,
+                            color_continuous_scale=color_scale,
+                            width = 800,
+                            height = 800)
+    
+    fig.show()
+
 def Scatter_Matrix(df,dimentions,color = '',color_scale = 'Bluered'):
     dim_dic_list = []
     for di in dimentions:
@@ -723,7 +732,7 @@ def Scatter_Matrix(df,dimentions,color = '',color_scale = 'Bluered'):
                         line_width=0.5,
                         opacity = 0.4
                     ),
-                    showupperhalf=False,
+                    
                     ))
     else:
         fig = go.Figure(data=go.Splom(
@@ -737,7 +746,7 @@ def Scatter_Matrix(df,dimentions,color = '',color_scale = 'Bluered'):
                         colorscale=color_scale,
                         opacity = 0.4
                     ),
-                    showupperhalf=False,
+                    
                     ))
     fig.update_layout(
         dragmode='select',

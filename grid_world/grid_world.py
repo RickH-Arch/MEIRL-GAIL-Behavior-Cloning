@@ -3,6 +3,7 @@ import numpy as np
 from tqdm import tqdm
 from utils import utils
 from grid_world import grid_utils,grid_plot
+from grid_world.experts import Experts
 import math
 from datetime import datetime
 import pickle
@@ -29,32 +30,37 @@ class GridWorld:
         
         self.trans_prob = trans_prob
         
-        self.states = self.GetAllStates()
-        self.n_states = len(self.states)
+        self.count_grid = np.load(count_grid_filePath)#每个网格被经过的次数
+        self.p_grid = self.count_grid/np.sum(self.count_grid)#每个网格被经过的概率
+
+        self.states_all = self.GetAllStates()
+        self.states_active = self.GetAllActiveStates()
+        self.n_states_all = len(self.states_all)
+        self.n_states_active = len(self.states_active)
         self.n_actions = 5
         self.actions = [0,1,2,3,4]
         self.neighbors = [0,width,-width,-1,1]
-        
-        self.count_grid = np.load(count_grid_filePath)#每个网格被经过的次数
-        self.p_grid = self.count_grid/np.sum(self.count_grid)#每个网格被经过的概率
+
+        #-------环境，特征----------
         #环境，状态-环境，环境列表
         self.envs,self.states_envs,self.envs_list = self.ReadEnvironments(environments_folderPath)
         #特征，状态-特征，特征列表
         self.features,self.states_features,self.features_list = self.ReadFeatures(features_folderPath)
         self.features_arr = np.array(list(self.states_features.values()))
-        #专家轨迹
-        self.df_expert_trajs = self.ReadExpertTrajs(expert_traj_filePath)
-        self.expert_trajs = self.df_expert_trajs['trajs'].tolist()
-        self.traj_avg_length = int(np.mean(self.df_expert_trajs['trajs'].apply(lambda x:len(x))))
 
-        
+        #-------专家轨迹----------
+        self.experts = Experts(expert_traj_filePath,self.width,self.height)
 
         #transition probability
+        self.state_adjacent_mat = self.GetStateAdjacentMat()
         self.dynamics = self.GetTransitionMat()
 
         #get time
         current_time = datetime.now()
         self.date = str(current_time.month)+str(current_time.day)
+
+        #helper
+        self.dynamics_track = []
 
 #------------------------------------Get Method------------------------------------------
         
@@ -87,19 +93,37 @@ class GridWorld:
                         a at state s0
         '''
 
-        P_a = np.zeros((self.n_states,self.n_actions,self.n_states))
-        for state in self.states:
+        P_a = np.zeros((self.n_states_all,self.n_actions,self.n_states_all))
+        for state in self.states_active:
             for a in self.actions:
                 probs = self.GetTransitionStatesAndProbs(state,a)
                 for next_s,prob in probs:
                     P_a[state,a,next_s] = prob
         return P_a
+    
+    def GetStateAdjacentMat(self):
+        '''
+        get adjacent matrix of the gridworld
+
+        return:
+            adjacent_mat         N_STATESxN_STATES adjacent matrix - 
+                        adjacent_mat[s0, s1] is 1 if s1 is adjacent to s0
+        '''
+        adjacent_mat = np.zeros((self.n_states_all,self.n_states_all))
+        for s in range(self.n_states_all):
+            adjacent_mat[s,s] = 1
+        for traj in self.experts.trajs_all:
+            for i in range(len(traj)-1):
+                adjacent_mat[traj[i],traj[i+1]] = 1
+                adjacent_mat[traj[i+1],traj[i]] = 1
+        return adjacent_mat
 
     def GetTransitionStatesAndProbs(self,state,action):
         if self.trans_prob == 1:
             inc = self.neighbors[action]
             next_s = state + inc
-            if next_s not in self.states:
+            #如果不通或者出界，返回原地
+            if self.state_adjacent_mat[state,next_s] == 0 or next_s not in self.states_active:
                 return [(state,1)]
             else:
                 return[(next_s,1)]
@@ -112,7 +136,7 @@ class GridWorld:
             for a in self.actions:
                 inc = self.neighbors[a]
                 next_s = state + inc
-                if next_s not in self.states:
+                if self.state_adjacent_mat[state,next_s] == 0 or next_s not in self.states_active:
                     mov_probs[-1] += mov_probs[a]
                     mov_probs[a] = 0
 
@@ -134,7 +158,7 @@ class GridWorld:
             env_array = np.load(os.path.join(folder_path,file_name))
             environments.update({file_name.split("_")[0]:env_array})
         states_envs = {}
-        for state in self.states:
+        for state in self.states_all:
             states_envs.update({state:self._loadStateEnvs(state,environments)})
         environment_list = list(environments.keys())
         return environments,states_envs,environment_list
@@ -146,7 +170,7 @@ class GridWorld:
             feature_array = np.load(os.path.join(folder_path,file_name))
             features.update({file_name.split("_")[0]:feature_array})
         states_features = {}
-        for state in self.states:
+        for state in self.states_all:
             states_features.update({state:self._loadStateFeatures(state,features)})
         feature_list = list(features.keys())
         return features,states_features,feature_list
@@ -213,6 +237,30 @@ class GridWorld:
 
     def ShowGridWorld_Activated(self):
         grid_plot.ShowGridWorld(self.GetActiveGrid())
-
     
+
+
+#--------------------------------helper mathod------------------------------------------
+    
+    def ShowAllActiveStatesPosition(self):
+        states_position = np.zeros((self.height,self.width))
+        for state in self.states_active:
+            x,y = self.StateToCoord(state)
+            states_position[y,x] = 1
+        grid_plot.ShowGridWorld(states_position)
+
+    def ShowDynamics(self,dir):
+        if len(self.dynamics_track) == 0:
+            dynamic_track = [[],[],[],[],[]]
+            for i in range(self.dynamics.shape[0]):
+                x_start,y_start = self.StateToCoord(i)
+                for j in range(self.dynamics.shape[1]):
+                    for k in range(self.dynamics.shape[2]):
+                        if self.dynamics[i,j,k] != 0:
+                            x_end,y_end = self.StateToCoord(k)
+                            
+                            dynamic_track[j].append([x_start,y_start,x_end,y_end,self.dynamics[i,j,k]])
+            self.dynamics_track = dynamic_track
+
+        grid_plot.ShowDynamics(self.dynamics_track,dir,self.width,self.height,self.GetActiveGrid())
     
