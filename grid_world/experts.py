@@ -15,17 +15,24 @@ class Experts:
     def __init__(self,trajs_file_path,width,height):
         self.width = width
         self.height = height
-        self.ReadExpertTrajs(trajs_file_path)
-        self.trajs_all = self.df_trajs['trajs'].tolist()
-        self.traj_all_avg_length = int(np.mean(self.df_trajs['trajs'].apply(lambda x:len(x))))
-        self.mac_list = self.df_trajs['m'].tolist()
-        self.traj_lens = self.df_trajs['trajs'].apply(lambda x:len(x)).tolist()
-        self.traj_clusterd_avg_length = -1
+        self.df_trajs_all = self.ReadExpertTrajs(trajs_file_path)
+        self.trajs_all = self.df_trajs_all['trajs'].tolist()
+        self.traj_all_avg_length = int(np.mean(self.df_trajs_all['trajs'].apply(lambda x:len(x))))
+        self.mac_list = self.df_trajs_all['m'].tolist()
+        self.traj_all_lens = self.df_trajs_all['trajs'].apply(lambda x:len(x)).tolist()
+
+        self.clusterReaded = False
+        #clustered result
+        self.df_trajs = self.df_trajs_all
+        self.trajs = self.trajs_all
+        self.traj_avg_length = self.traj_all_avg_length
         self.cluster_now = -1
+        
 
     def ReadExpertTrajs(self,trajs_file_path):
-        self.df_trajs = pd.read_csv(trajs_file_path)
-        self.df_trajs['trajs'] = self.df_trajs['trajs'].apply(lambda x:eval(x))
+        df_trajs_all = pd.read_csv(trajs_file_path)
+        df_trajs_all['trajs'] = df_trajs_all['trajs'].apply(lambda x:eval(x))
+        return df_trajs_all
         
     def GetExpertTraj(self,m):
         return self.df_trajs[self.df_trajs['m']==m]['trajs'].tolist()[0]
@@ -72,9 +79,22 @@ class Experts:
 
     def ReadCluster(self,c_result):
         c = []
-        for i,r in self.df_trajs.iterrows():
+        for i,r in self.df_trajs_all.iterrows():
             if r['m'] in c_result.mac.tolist():
                 c.append(c_result[c_result.mac == r['m']].cluster.values[0])
             else:
                 c.append(-1)
-        self.df_trajs['cluster'] = c
+        self.df_trajs_all['cluster'] = c
+        self.clusterReaded = True
+
+
+    def ApplyCluster(self,c_set):
+        '''
+        This function must called after the ReadCluster Function
+        c_set: indexes of applied clusters
+        '''
+        if not self.clusterReaded:
+            raise ValueError("Must read cluster result first")
+        self.df_trajs = self.df_trajs_all[self.df_trajs_all['cluster'].isin(c_set)].reset_index(drop=True)
+        self.trajs = self.df_trajs['trajs'].tolist()
+        self.traj_avg_length = int(np.mean(self.df_trajs['trajs'].apply(lambda x:len(x))))

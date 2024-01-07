@@ -69,10 +69,18 @@ def ShowDynamics(dynamic_track,dir,width,height,grid):
                              marker_size=7,))
 
     for t in track:
-        if t[0] == t[2] and t[1] == t[3]:
-            continue
         x = []
         y = []
+        if t[0] == t[2] and t[1] == t[3]:
+            #stay in same state
+            x.append(t[0])
+            y.append(t[1])
+            fig.add_trace(go.Scatter(x=x,y=y,mode='markers',
+                                     marker_symbol = 'circle',
+                                     marker_color = "red",
+                                     marker_size=t[4]*3,))
+            continue
+        
         x.append(t[0])
         y.append(t[1])
         mid_x = (t[0]+t[2])/2
