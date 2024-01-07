@@ -19,7 +19,6 @@ class GridWorld:
     actions: 0:stay,1:up,2:down,3:left,4:right
     '''
     def __init__(self,
-                 count_grid_filePath,
                  environments_folderPath,
                  features_folderPath,
                 expert_traj_filePath,
@@ -30,7 +29,11 @@ class GridWorld:
         
         self.trans_prob = trans_prob
         
-        self.count_grid = np.load(count_grid_filePath)#每个网格被经过的次数
+         #-------专家轨迹----------
+        self.experts = Experts(expert_traj_filePath,self.width,self.height)
+
+        #------initialize states----------
+        self.count_grid = self.GetCountGrid()#每个网格被经过的次数
         self.p_grid = self.count_grid/np.sum(self.count_grid)#每个网格被经过的概率
 
         self.states_all = self.GetAllStates()
@@ -42,18 +45,20 @@ class GridWorld:
         self.neighbors = [0,width,-width,-1,1]
 
         #-------环境，特征----------
-        #环境，状态-环境，环境列表
+        #环境，状态-环境，环境名称列表
         self.envs,self.states_envs,self.envs_list = self.ReadEnvironments(environments_folderPath)
-        #特征，状态-特征，特征列表
+        #特征，状态-特征，特征名称列表
         self.features,self.states_features,self.features_list = self.ReadFeatures(features_folderPath)
-        self.features_arr = np.array(list(self.states_features.values()))
-
-        #-------专家轨迹----------
-        self.experts = Experts(expert_traj_filePath,self.width,self.height)
+        #特征列表，转换字典
+        self.features_arr,self.fid_state,self.state_fid = self.GetAvtiveFeatureArr(self.states_features)
+        
+       
 
         #transition probability
         self.state_adjacent_mat = self.GetStateAdjacentMat()
         self.dynamics = self.GetTransitionMat()
+        #仅记录active的dynamics，系数需要经过state_fid转换
+        self.dynamics_fid = self.GetTransitionMatActived()
 
         #get time
         current_time = datetime.now()
@@ -63,7 +68,16 @@ class GridWorld:
         self.dynamics_track = []
 
 #------------------------------------Get Method------------------------------------------
-        
+    def GetCountGrid(self):
+        count_grid = np.zeros((self.height,self.width))
+        trajs = self.experts.trajs_all
+        for traj in trajs:
+            for t in traj:
+                s = t[0]
+                x,y = self.StateToCoord(s)
+                count_grid[y,x] += 1
+        return count_grid
+
     def GetAllActiveStates(self):
         states = []
         for i in range(self.height):
@@ -88,7 +102,7 @@ class GridWorld:
 
         return:
             P_a         N_STATESxN_STATESxN_ACTIONS transition probabilities matrix - 
-                        P_a[s0, s1, a] is the transition prob of 
+                        P_a[s0,a,s1] is the transition prob of 
                         landing at state s1 when taking action 
                         a at state s0
         '''
@@ -101,6 +115,16 @@ class GridWorld:
                     P_a[state,a,next_s] = prob
         return P_a
     
+    def GetTransitionMatActived(self):
+        P_a = np.zeros((self.n_states_active,self.n_actions,self.n_states_active))
+        as_set = set(self.states_active)
+        for s_0 in range(self.dynamics.shape[0]):
+            for a in range(self.dynamics.shape[1]):
+                for s_1 in range(self.dynamics.shape[2]):
+                    if s_0 in as_set and s_1 in as_set:
+                        P_a[self.state_fid[s_0],a,self.state_fid[s_1]] = self.dynamics[s_0,a,s_1]
+        return P_a
+
     def GetStateAdjacentMat(self):
         '''
         get adjacent matrix of the gridworld
@@ -137,7 +161,7 @@ class GridWorld:
                 inc = self.neighbors[a]
                 next_s = state + inc
                 if self.state_adjacent_mat[state,next_s] == 0 or next_s not in self.states_active:
-                    mov_probs[-1] += mov_probs[a]
+                    mov_probs[0] += mov_probs[a]
                     mov_probs[a] = 0
 
             res = []
@@ -148,6 +172,16 @@ class GridWorld:
                     res.append((next_s,mov_probs[a]))
             return res
 
+    def GetAvtiveFeatureArr(self,states_features):
+        feature_arr = []
+        fid_state = {}
+        state_fid = {}
+        for state,features in states_features.items():
+            if state in self.states_active:
+                feature_arr.append(features)
+                fid_state[len(fid_state)] = state
+                state_fid[state] = len(state_fid)
+        return np.array(feature_arr),fid_state,state_fid
 
 #------------------------------------Init Function------------------------------------------ 
     

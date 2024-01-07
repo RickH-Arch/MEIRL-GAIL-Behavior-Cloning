@@ -7,9 +7,7 @@ import math
 from datetime import datetime
 import pickle
 import os
-from datetime import datetime
-current_time = datetime.now()
-date = str(current_time.month)+str(current_time.day)
+
 
 class DataParser:
     '''
@@ -25,7 +23,7 @@ class DataParser:
         self.df_wifipos = df_wifipos
         self.df_path = df_path
         current_time = datetime.now()
-        self.date = str(current_time.month)+str(current_time.day)
+        self.date = utils.date
         self.features = {}
         self.environments = {}
 
@@ -93,7 +91,7 @@ class DataParser:
             for j in range(0,image_array.shape[1]):
                 env_array[i,j] = np.sum(image_array[i,j,:])
 
-        folder_path = os.path.join('wifi_track_data/dacang/grid_data/envs_grid',date)
+        folder_path = os.path.join('wifi_track_data/dacang/grid_data/envs_grid',self.date)
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
         np.save(folder_path+f"/{feature_name}_env.npy",env_array)
@@ -107,7 +105,7 @@ class DataParser:
 
         feature_array = utils.Normalize_2DArr(feature_array)
 
-        folder_path = os.path.join('wifi_track_data/dacang/grid_data/features_grid',date)
+        folder_path = os.path.join('wifi_track_data/dacang/grid_data/features_grid',self.date)
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
         np.save(folder_path+f"/{feature_name}_feature.npy",feature_array)

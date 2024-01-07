@@ -10,6 +10,16 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.metrics import calinski_harabasz_score
 
+from datetime import datetime
+current_time = datetime.now()
+month = str(current_time.month)
+if len(month) == 1:
+    month = '0'+month
+day = str(current_time.day)
+if len(day) == 1:
+    day = '0'+day
+date = month+day
+
 
 
 def Normalize_arr(arr):
