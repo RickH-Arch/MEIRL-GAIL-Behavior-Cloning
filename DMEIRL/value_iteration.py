@@ -2,7 +2,7 @@ import torch
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 import numpy as np
 
-def value_iteration(threshold, world, rewards, discount = 0.01):
+def value_iteration(threshold, world, rewards, discount = 0.01,showInfo = False):
     V = torch.zeros(world.n_states_active,dtype=torch.float32).to(device)
     delta = np.inf 
 
@@ -18,7 +18,8 @@ def value_iteration(threshold, world, rewards, discount = 0.01):
                 index = world.state_fid[s]
                 delta = max(delta,torch.abs(V[index] - max_v).detach().cpu().numpy())
                 V[index] = max_v
-            #print(f"delta: {delta}")
+            if showInfo:
+                print(f"delta: {delta}")
         #print("value_iteration done, computing policy...")
 
         policy = torch.zeros((world.n_states_active,world.n_actions),dtype=torch.float32).to(device)

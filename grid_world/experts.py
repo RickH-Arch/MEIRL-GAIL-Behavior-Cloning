@@ -25,6 +25,7 @@ class Experts:
         #clustered result
         self.df_trajs = self.df_trajs_all
         self.trajs = self.trajs_all
+        self.trajs_count = len(self.trajs)
         self.traj_avg_length = self.traj_all_avg_length
         self.cluster_now = -1
         

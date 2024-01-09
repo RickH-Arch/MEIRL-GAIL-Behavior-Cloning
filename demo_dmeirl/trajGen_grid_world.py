@@ -114,7 +114,7 @@ class GridWorld_trajGen:
         policy = value_iteration(0.0001,self,real_rewards,self.discount)
         return policy.argmax(1)
     
-    def GenerateTrajectories(self,traj_count,traj_length,policy=None):
+    def GenerateTrajectories(self,traj_count,traj_length,policy=None,save = False):
         if not policy:
             policy = self.OptimalPolicy()
         policy = policy.cpu().numpy()
@@ -130,7 +130,8 @@ class GridWorld_trajGen:
             trajs.append(traj)
         m = np.array(range(1,(len(trajs)+1)))
         df_trajs = pd.DataFrame({'m':m,'trajs':trajs})
-        df_trajs.to_csv(f'demo_expert_trajs_{utils.date}.csv',index=False)
+        if save:
+            df_trajs.to_csv(f'demo_expert_trajs_{utils.date}.csv',index=False)
         return df_trajs
     
     def feature_vector(self, state, discrete=True):

@@ -285,11 +285,17 @@ class GridWorld:
     def ShowGridWorld_Count(self):
         grid_plot.ShowGridWorld(self.count_grid)
 
+    def ShowGridWorld_Count_log(self):
+        grid_plot.ShowGridWorld(np.log(self.count_grid+1))
+
     def ShowGridWorld_Freq(self):
         grid_plot.ShowGridWorld(self.p_grid)
 
     def ShowGridWorld_Activated(self):
         grid_plot.ShowGridWorld(self.GetActiveGrid())
+
+    def ShowRewardsResult(self,rewards):
+        grid_plot.ShowGridWorld(rewards)
     
 
 
