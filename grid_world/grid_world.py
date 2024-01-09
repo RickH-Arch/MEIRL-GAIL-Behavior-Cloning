@@ -4,30 +4,29 @@ from tqdm import tqdm
 from utils import utils
 from grid_world import grid_utils,grid_plot
 from grid_world.experts import Experts
-import math
 from datetime import datetime
-import pickle
 import os
-from datetime import datetime
-current_time = datetime.now()
-date = str(current_time.month)+str(current_time.day)
-
 
 class GridWorld:
     '''
     class to initialize grid world,
-    actions: 0:stay,1:up,2:down,3:left,4:right
+    actions: 0:stay, 1:up, 2:down, 3:left, 4:right
     '''
     def __init__(self,
-                 environments_folderPath,
-                 features_folderPath,
-                expert_traj_filePath,
+                 environments_folderPath = None,
+                 features_folderPath = None,
+                 states_features = None,
+                expert_traj_filePath = None,
                  width = 100,height = 75,
-                 trans_prob = 0.9) -> None:
+                 trans_prob = 0.9,
+                 discount = 0.9,
+                 active_all = False) -> None:
         self.width = width
         self.height = height
         
         self.trans_prob = trans_prob
+        self.discount = discount
+        self.active_all = active_all
         
          #-------专家轨迹----------
         self.experts = Experts(expert_traj_filePath,self.width,self.height)
@@ -37,23 +36,31 @@ class GridWorld:
         self.p_grid = self.count_grid/np.sum(self.count_grid)#每个网格被经过的概率
 
         self.states_all = self.GetAllStates()
-        self.states_active = self.GetAllActiveStates()
         self.n_states_all = len(self.states_all)
+
+        self.states_active = self.GetAllActiveStates()
         self.n_states_active = len(self.states_active)
         self.n_actions = 5
         self.actions = [0,1,2,3,4]
+        self.actions_vector = [[0,0],[0,1],[0,-1],[-1,0],[1,0]]
         self.neighbors = [0,width,-width,-1,1]
 
         #-------环境，特征----------
         #环境，状态-环境，环境名称列表
-        self.envs,self.states_envs,self.envs_list = self.ReadEnvironments(environments_folderPath)
+        if environments_folderPath:
+            self.envs,self.states_envs,self.envs_list = self.ReadEnvironments(environments_folderPath)
         #特征，状态-特征，特征名称列表
-        self.features,self.states_features,self.features_list = self.ReadFeatures(features_folderPath)
+        if features_folderPath:
+            self.features,self.states_features,self.features_list = self.ReadFeatures(features_folderPath)
+        else:
+            if states_features:
+                self.states_features = states_features
+            else:
+                raise Exception("feature_folderPath and states_features can't be None at the same time")
+            
         #特征列表，转换字典
         self.features_arr,self.fid_state,self.state_fid = self.GetAvtiveFeatureArr(self.states_features)
         
-       
-
         #transition probability
         self.state_adjacent_mat = self.GetStateAdjacentMat()
         self.dynamics = self.GetTransitionMat()
@@ -79,6 +86,8 @@ class GridWorld:
         return count_grid
 
     def GetAllActiveStates(self):
+        if self.active_all:
+            return self.states_all
         states = []
         for i in range(self.height):
             for j in range(self.width):
@@ -144,10 +153,9 @@ class GridWorld:
 
     def GetTransitionStatesAndProbs(self,state,action):
         if self.trans_prob == 1:
-            inc = self.neighbors[action]
-            next_s = state + inc
+            next_s = self.LegalStateAction(state,action)
             #如果不通或者出界，返回原地
-            if self.state_adjacent_mat[state,next_s] == 0 or next_s not in self.states_active:
+            if next_s == -1:
                 return [(state,1)]
             else:
                 return[(next_s,1)]
@@ -158,9 +166,8 @@ class GridWorld:
             mov_probs[action] = self.trans_prob
 
             for a in self.actions:
-                inc = self.neighbors[a]
-                next_s = state + inc
-                if self.state_adjacent_mat[state,next_s] == 0 or next_s not in self.states_active:
+                next_s = self.LegalStateAction(state,a)
+                if next_s == -1:
                     mov_probs[0] += mov_probs[a]
                     mov_probs[a] = 0
 
@@ -254,6 +261,18 @@ class GridWorld:
     def GetActiveGrid(self,threshold = 0):
         self.active_grid = (self.count_grid>threshold).astype(int)
         return self.active_grid
+    
+    def LegalStateAction(self,state,action):
+        inc = self.neighbors[action]
+        dir = self.actions_vector[action]
+        coord = self.StateToCoord(state)
+        next_s = state + inc
+        next_coord = (coord[0] + dir[0], coord[1] + dir[1])
+        if next_coord[0]<0 or next_coord[0]>self.width-1 or next_coord[1] < 0 or next_coord[1] > self.height-1:
+            return -1
+        if next_s not in self.states_active:
+            return -1
+        return next_s
 
 #------------------------------------Plot------------------------------------------
     

@@ -14,16 +14,16 @@ from datetime import datetime
 current_time = datetime.now()
 date = str(current_time.month)+str(current_time.day)
 
-def ShowGridWorld(grid):
+def ShowGridWorld(grid,width = 600,height = 450):
     fig = go.Figure(data=go.Heatmap(
                     z=grid,))
 
     fig.update_layout(
         title='Grid World',
         autosize=False,
-        width=600,
-        height=450,
-        margin=dict(l=65, r=50, b=65, t=90),
+        width=width,
+        height=height,
+        margin=dict(l=20, r=20, b=50, t=50),
         
     )
     fig.show()

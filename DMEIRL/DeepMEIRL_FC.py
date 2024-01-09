@@ -46,13 +46,12 @@ class DeepMEIRL_FC(nn.Module):
         return out
     
 class DMEIRL:
-    def __init__(self,world,layers = (50,30),discount = 0.9,load = "",lr = 0.001,weight_decay = 1,clip_norm = 1):
+    def __init__(self,world,layers = (50,30),load = "",lr = 0.001,weight_decay = 1,clip_norm = -1):
         self.clip_norm = clip_norm
         
         self.world = world
         self.trajs = world.experts.trajs
         self.features = torch.from_numpy(world.features_arr).float().to(device)
-        self.discount = discount
         self.dynamics = torch.from_numpy(world.dynamics).float().to(device)
 
         self.model = DeepMEIRL_FC(self.features.shape[1],layers = layers)
@@ -64,7 +63,7 @@ class DMEIRL:
 
         #self.optimizer = self.model.optimizer
 
-    def train(self,n_epochs, save_rewards = True):
+    def train(self,n_epochs, save_rewards = True, demo = False):
         self.rewards = []
         svf = self.StateVisitationFrequency()
         compare = nn.MSELoss()
@@ -72,43 +71,51 @@ class DMEIRL:
         exploded = False
 
         for i in tqdm(range(n_epochs)):
-            print("=============================epoch{}=============================".format(i+1))
+            if not demo:
+                print("=============================epoch{}=============================".format(i+1))
             
             rewards = self.model(self.features).flatten()
             if save_rewards:
                 self.rewards.append(rewards.detach().cpu().numpy())
-                last_file = f"wifi_track_data/dacang/train_data/rewards_{self.model.name}_epoch{i}_{utils.date}.npy"
-                if os.path.exists(last_file):
-                    os.remove(last_file)
-                np.save(f"wifi_track_data/dacang/train_data/rewards_{self.model.name}_epoch{i+1}_{utils.date}.npy" ,self.rewards)
+                if not demo:
+                    last_file = f"wifi_track_data/dacang/train_data/rewards_{self.model.name}_epoch{i}_{utils.date}.npy"
+                    if os.path.exists(last_file):
+                        os.remove(last_file)
+                    np.save(f"wifi_track_data/dacang/train_data/rewards_{self.model.name}_epoch{i+1}_{utils.date}.npy" ,self.rewards)
             if i > 0 :
                 with torch.no_grad():
                     com = compare(torch.from_numpy(self.rewards[-1]).float(),torch.from_numpy(self.rewards[-2]).float())
                     com = com*100000000
-                    print(f"=====reward compare: {com-com_last}=====")
-                    if com - com_last > 1 and not exploded and i>50:
-                        np.save(f"wifi_track_data/dacang/train_data/rewards_beforeExplode_{self.model.name}_epoch{i+1}_{utils.date}.npy" ,self.rewards)
-                        torch.save(self.model.state_dict(),f"wifi_track_data/dacang/train_data/model_beforeExploded_{self.model.name}_epochs{i+1}_{utils.date}.pth")
-                        exploded = True
+                    
+                    if not demo:
+                        print(f"=====reward compare: {com-com_last}=====")
+                        if com - com_last > 1 and not exploded and i>50:
+                            np.save(f"wifi_track_data/dacang/train_data/rewards_beforeExplode_{self.model.name}_epoch{i+1}_{utils.date}.npy" ,self.rewards)
+                            torch.save(self.model.state_dict(),f"wifi_track_data/dacang/train_data/model_beforeExploded_{self.model.name}_epochs{i+1}_{utils.date}.pth")
+                            exploded = True
                     com_last = com
             
-            print(f"epoch{i+1} policy value_iteration start")
-            policy = value_iteration(0.001,self.world,rewards.detach(),self.discount)
+            if not demo:
+                print(f"epoch{i+1} policy value_iteration start")
+            policy = value_iteration(0.0001,self.world,rewards.detach(),self.world.discount)
             exp_svf = self.Expected_StateVisitationFrequency(policy)
             r_grad = svf - exp_svf
 
             self.optimizer.zero_grad()
             rewards.backward(-r_grad)
-            total_norm = nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.clip_norm, norm_type=2)
-            print("total_norm:",total_norm)
+            if self.clip_norm != -1 and not demo:
+                total_norm = nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.clip_norm, norm_type=2)
+                if not demo:
+                    print("total_norm:",total_norm)
             self.optimizer.step()
-
-            last_model = f"wifi_track_data/dacang/train_data/model_{self.model.name}_epochs{i}_{utils.date}.pth"
-            if os.path.exists(last_model):
-                os.remove(last_model)
-            torch.save(self.model.state_dict(),f"wifi_track_data/dacang/train_data/model_{self.model.name}_epochs{i+1}_{utils.date}.pth")
             
-            print(f"epoch{i+1} policy value_iteration end")
+            if not demo:
+                last_model = f"wifi_track_data/dacang/train_data/model_{self.model.name}_epochs{i}_{utils.date}.pth"
+                if os.path.exists(last_model):
+                    os.remove(last_model)
+                torch.save(self.model.state_dict(),f"wifi_track_data/dacang/train_data/model_{self.model.name}_epochs{i+1}_{utils.date}.pth")
+            
+                print(f"epoch{i+1} policy value_iteration end")
 
         with torch.no_grad():
             rewards = self.model.forward(self.features).flatten()
@@ -127,7 +134,7 @@ class DMEIRL:
     def Expected_StateVisitationFrequency(self,policy):
         #probability of visiting the initial state
         dynamics_fid = torch.from_numpy(self.world.dynamics_fid).float().to(device)
-        print("Expected_StateVisitationFrequency start")
+        #print("Expected_StateVisitationFrequency start")
         with torch.no_grad():
             prob_initial_state = torch.zeros(self.world.n_states_active,dtype=torch.float32).to(device)
             for traj in self.trajs:
