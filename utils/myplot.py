@@ -13,11 +13,16 @@ from datetime import datetime
 current_time = datetime.now()
 date = str(current_time.month)+str(current_time.day)
 
+try:
+    img_path = os.getcwd()+'/wifi_track_data/dacang/imgs/roads.png'
+    img = Image.open(img_path)
+    background_img = img
+    buttom_img = Image.fromarray(np.array(img.transpose(Image.FLIP_TOP_BOTTOM))).convert('P', palette='WEB', dither=None)
+except:
+    print("no background image")
+    background_img = Image.fromarray(np.ones((300,400,3), dtype='uint8')).convert('P', palette='WEB')
+    buttom_img = Image.fromarray(np.ones((300,400,3), dtype='uint8')).convert('P', palette='WEB')
 
-img_path = os.getcwd()+'/wifi_track_data/dacang/imgs/roads.png'
-img = Image.open(img_path)
-background_img = img
-buttom_img = Image.fromarray(np.array(img.transpose(Image.FLIP_TOP_BOTTOM))).convert('P', palette='WEB', dither=None)
 dum_img = Image.fromarray(np.ones((3,3,3), dtype='uint8')).convert('P', palette='WEB')
 idx_to_color = np.array(dum_img.getpalette()).reshape((-1, 3))
 colorscale=[[i/255.0, "rgb({}, {}, {})".format(*rgb)] for i, rgb in enumerate(idx_to_color)]
