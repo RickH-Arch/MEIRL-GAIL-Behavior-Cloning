@@ -14,12 +14,12 @@ from datetime import datetime
 current_time = datetime.now()
 date = str(current_time.month)+str(current_time.day)
 
-def ShowGridWorld(grid,width = 600,height = 450):
+def ShowGridWorld(grid,width = 600,height = 450,title = "Grid World"):
     fig = go.Figure(data=go.Heatmap(
                     z=grid,))
 
     fig.update_layout(
-        title='Grid World',
+        title=title,
         autosize=False,
         width=width,
         height=height,
@@ -27,6 +27,34 @@ def ShowGridWorld(grid,width = 600,height = 450):
         
     )
     fig.show()
+
+def ShowGridWorld_anime(grids,width = 600,height = 450,title = "Grid World"):
+    fig = go.Figure(
+        data=[go.Heatmap(z=grids[0],)],
+        layout=go.Layout(
+            title=title,
+            autosize=False,
+            width=width,
+            height=height,
+            margin=dict(l=20, r=20, b=50, t=50),
+            updatemenus=[dict(
+                type="buttons",
+                buttons=[dict(label="Play",
+                              method="animate",
+                              args=[None, {"frame": {"duration": 10, "redraw": True},
+                                           "fromcurrent": True, "transition": {"duration": 1000}}]),
+                         dict(label="Pause",
+                              method="animate",
+                              args=[[None], {"frame": {"duration": 0, "redraw": False},
+                                             "mode": "immediate",
+                                             "transition": {"duration": 0}}])])]
+        ),
+         frames=[go.Frame(data=go.Heatmap(z=grid)) for grid in grids],   
+        )
+        
+    fig.show()
+
+    
 
 def ShowGridWorlds(grids_dict):
     fig = make_subplots(rows=float.__ceil__(len(grids_dict)/4),

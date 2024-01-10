@@ -285,8 +285,8 @@ class GridWorld:
     def ShowGridWorld_Count(self):
         grid_plot.ShowGridWorld(self.count_grid)
 
-    def ShowGridWorld_Count_log(self):
-        grid_plot.ShowGridWorld(np.log(self.count_grid+1))
+    def ShowGridWorld_Count_log(self,title = "count_log"):
+        grid_plot.ShowGridWorld(np.log(self.count_grid+1),400,400,title=title)
 
     def ShowGridWorld_Freq(self):
         grid_plot.ShowGridWorld(self.p_grid)
@@ -294,9 +294,23 @@ class GridWorld:
     def ShowGridWorld_Activated(self):
         grid_plot.ShowGridWorld(self.GetActiveGrid())
 
-    def ShowRewardsResult(self,rewards):
-        grid_plot.ShowGridWorld(rewards)
-    
+    def ShowRewardsResult(self,rewards,title = "Restored Rewards"):
+        rewards = self.RewardsToMatrix(rewards)
+        grid_plot.ShowGridWorld(rewards,400,400,title=title)
+
+    def ShowRewardsAnimation(self,rewards,title = "Restored Rewards"):
+        r = []
+        for reward in rewards:
+            r.append(self.RewardsToMatrix(reward))
+        grid_plot.ShowGridWorld_anime(r,500,400,title=title)
+
+    def RewardsToMatrix(self,rewards):
+        rewards_matrix = np.zeros((self.height,self.width))
+        for i in range(len(rewards)):
+            state = self.fid_state[i]
+            coord = self.StateToCoord(state)
+            rewards_matrix[coord[1],coord[0]] = rewards[i]
+        return rewards_matrix
 
 
 #--------------------------------helper mathod------------------------------------------

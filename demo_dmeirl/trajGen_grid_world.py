@@ -3,7 +3,7 @@ import numpy as np
 from tqdm import tqdm
 from utils import utils
 from grid_world import grid_utils,grid_plot
-from DMEIRL.value_iteration import value_iteration_fullGrid as value_iteration
+from DMEIRL.value_iteration import value_iteration
 import torch
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 import math
@@ -19,7 +19,7 @@ class GridWorld_trajGen:
     class to generate grid world trajectories according to manual set rewards
     actions: 0:stay, 1:up, 2:down, 3:left, 4:right
     '''
-    def __init__(self,width,height,real_rewards_matrix,n_objects = 10,n_colors = 2,trans_prob = 0.9,discount = 0.99):
+    def __init__(self,width,height,real_rewards_matrix,deactive_states = [],n_objects = 10,n_colors = 2,trans_prob = 0.9,discount = 0.99):
         self.width = width
         self.height = height
         self.trans_prob = trans_prob
@@ -28,16 +28,23 @@ class GridWorld_trajGen:
         self.n_colors = n_colors
         
         self.state_now = -1
-        self.states = self.GetAllStates()
-        self.n_states = len(self.states)
+
+        self.states_all = self.GetAllStates()
+        self.states_active = self.states_all.copy()
+        for s in deactive_states:
+            if s in self.states_active:
+                self.states_active.remove(s)
+        
+        self.n_states_all= len(self.states_all)
+        self.n_states_active = len(self.states_active)
+
         self.actions = [0,1,2,3,4]
         self.actions_vector = [[0,0],[0,1],[0,-1],[-1,0],[1,0]]
         self.n_actions = len(self.actions)
-        self.neighbors = [0,width,-width,1,-1]
+        self.neighbors = [0,width,-width,-1,1]
         self.real_rewards_matrix = real_rewards_matrix
+        self.rewards_active = real_rewards_matrix.copy().reshape(self.width*self.height)[self.states_active]
 
-        self.dynamics = self.TransitionMat()
-        self.real_rewards_matrix = real_rewards_matrix
 
         self.objects = {}
         for _ in range(self.n_objects):
@@ -50,6 +57,14 @@ class GridWorld_trajGen:
                 if (x, y) not in self.objects:
                     break
             self.objects[x, y] = obj
+        self.states_features = self.GetStatesFeatures()
+        self.feature_arr,self.fid_state,self.state_fid = self.GetActiveFeatureArr(self.states_features)
+        
+        self.dynamics = self.TransitionMat()
+        self.dynamics_fid = self.dynamics
+        
+
+        
         
     
 
@@ -62,23 +77,28 @@ class GridWorld_trajGen:
     
     def reset(self,random = True):
         if random:
-            self.state = np.random.randint(self.n_states)
+            index = np.random.randint(self.n_states_active)
+            self.state = self.fid_state[index]
         else:
             self.state = 0
         return self.state
     
     def step(self, a):
-        probs = self.dynamics[self.state, a, :]
-        self.state = np.random.choice(self.n_states, p=probs)
+        index = self.state_fid[self.state]
+        probs = self.dynamics[index, a, :]
+        index = np.random.choice(self.n_states_active, p=probs)
+        self.state = self.fid_state[index]
         return self.state
     
     def TransitionMat(self):
-        P_a = np.zeros((self.n_states,self.n_actions,self.n_states))
-        for state in self.states:
+        P_a = np.zeros((self.n_states_active,self.n_actions,self.n_states_active))
+        for state in self.states_active:
             for a in self.actions:
                 probs = self.GetTransitionStatesAndProbs(state,a)
                 for next_s,prob in probs:
-                    P_a[state,a,next_s] = prob
+                    next_s = self.state_fid[next_s]
+                    pre_s = self.state_fid[state]
+                    P_a[pre_s,a,next_s] = prob
         return P_a
     
     def GetTransitionStatesAndProbs(self,state,action):
@@ -110,7 +130,8 @@ class GridWorld_trajGen:
             return res
         
     def OptimalPolicy(self):
-        real_rewards = torch.from_numpy(self.real_rewards_matrix.reshape(self.width*self.height)).float().to(device)
+        #real_rewards = torch.from_numpy(self.real_rewards_matrix.reshape(self.width*self.height)).float().to(device)
+        real_rewards = torch.from_numpy(self.rewards_active).float().to(device)
         policy = value_iteration(0.0001,self,real_rewards,self.discount)
         return policy.argmax(1)
     
@@ -123,7 +144,8 @@ class GridWorld_trajGen:
             traj = []
             state = self.reset()
             for j in range(traj_length):
-                action = policy[state]
+                index = self.state_fid[state]
+                action = policy[index]
                 next_state = self.step(action)
                 traj.append((state,action,next_state))
                 state = next_state
@@ -184,13 +206,25 @@ class GridWorld_trajGen:
 
         return state
     
-    def feature_matrix(self, discrete=True):
+    def GetStatesFeatures(self, discrete=False):
         features_arr =  np.array([self.feature_vector(i, discrete)
-                         for i in range(self.n_states)])
+                         for i in range(self.n_states_all)])
         states_features = {}
-        for i in range(self.n_states):
+        for i in range(self.n_states_all):
             states_features[i] = features_arr[i]
+        
         return states_features
+    
+    def GetActiveFeatureArr(self,states_features):
+        feature_arr = []
+        fid_state = {}
+        state_fid = {}
+        for state,features in states_features.items():
+            if state in self.states_active:
+                feature_arr.append(features)
+                fid_state[len(fid_state)] = state
+                state_fid[state] = len(state_fid)
+        return np.array(feature_arr),fid_state,state_fid
         
 #------------------------------------utils method------------------------------------------
     def LegalStateAction(self,state,action):
@@ -201,7 +235,7 @@ class GridWorld_trajGen:
         next_coord = (coord[0] + dir[0], coord[1] + dir[1])
         if next_coord[0]<0 or next_coord[0]>self.width-1 or next_coord[1] < 0 or next_coord[1] > self.height-1:
             return -1
-        if next_s not in self.states:
+        if next_s not in self.states_active:
             return -1
         return next_s
     
@@ -215,5 +249,5 @@ class GridWorld_trajGen:
         return (x,y)
     
 #------------------------------------show method------------------------------------------
-    def ShowRewards(self):
-        grid_plot.ShowGridWorld(self.real_rewards_matrix,400,400)
+    def ShowRewards(self,title = "Rewards"):
+        grid_plot.ShowGridWorld(self.real_rewards_matrix,400,400,title=title)

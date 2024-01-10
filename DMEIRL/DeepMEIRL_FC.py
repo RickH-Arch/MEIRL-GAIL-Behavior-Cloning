@@ -53,6 +53,7 @@ class DMEIRL:
         self.world = world
         self.trajs = world.experts.trajs
         self.features = torch.from_numpy(world.features_arr).float().to(device)
+        
         self.dynamics = torch.from_numpy(np.transpose(world.dynamics_fid,(2,1,0))).float().to(device)
 
         self.model = DeepMEIRL_FC(self.features.shape[1],layers = layers)
@@ -65,29 +66,27 @@ class DMEIRL:
         #self.optimizer = self.model.optimizer
 
     def train(self,n_epochs, save_rewards = True, demo = False,showInfo = False):
-        self.rewards = []
+        self.rewards_list = []
         svf = self.StateVisitationFrequency()
-        svf_np = svf.detach().cpu().numpy()
-        com_last = 100
         rewards = self.model(self.features).flatten()
-        self.rewards.append(rewards.detach().cpu().numpy())
+        self.rewards_list.append(rewards.detach().cpu().numpy())
         
         for i in tqdm(range(n_epochs)):
             if not demo:
                 print("=============================epoch{}=============================".format(i+1))
             if i != 0:
                 rewards = self.model(self.features).flatten()
-                self.rewards.append(rewards.detach().cpu().numpy())
+                self.rewards_list.append(rewards.detach().cpu().numpy())
 
             #save rewards
             if save_rewards and not demo:
                 self.SaveRewards(i)
 
-            #show compare 
-            if i > 0 and not demo:
-                com_last = self.CompareRewards(com_last)
-                if showInfo:
-                    print(f"compare: {com_last}")
+            # #show compare 
+            # if i > 0 and not demo:
+            #     com_last = self.CompareRewards(com_last)
+            #     if showInfo:
+            #         print(f"compare: {com_last}")
             
             if not demo:
                 print(f"epoch{i+1} policy value_iteration start")
@@ -113,7 +112,7 @@ class DMEIRL:
         with torch.no_grad():
             rewards = self.model.forward(self.features).flatten()
 
-        return rewards
+        return rewards.detach().cpu().numpy()
 
     def StateVisitationFrequency(self):
         svf = torch.zeros(self.world.n_states_active,dtype=torch.float32).to(device)

@@ -8,8 +8,7 @@ env_folder_path = r"wifi_track_data\dacang\grid_data\envs_grid\1230"
 feature_folder_path = r"wifi_track_data\dacang\grid_data\features_grid\1230"
 expert_traj_path = r"wifi_track_data\dacang\track_data\trajs_1230.csv"
 
-world = GridWorld(environments_folderPath=env_folder_path,
-                  features_folderPath=feature_folder_path,
+world = GridWorld(features_folderPath=feature_folder_path,
                   expert_traj_filePath=expert_traj_path,
                   width=80, height=60)
 df_cluster = pd.read_csv(r'wifi_track_data\dacang\cluster_data\cluster_result_0105.csv')
@@ -19,7 +18,7 @@ print("GridWorld initialized")
 
 #------------------------------------Initialize DMEIRL------------------------------------------
 
-dme = DMEIRL(world,layers=(50,30),lr=0.0002,clip_norm = 0.1)
+dme = DMEIRL(world,layers=(50,30),lr=0.001,clip_norm = 1)
 
 #------------------------------------Train------------------------------------------
 
