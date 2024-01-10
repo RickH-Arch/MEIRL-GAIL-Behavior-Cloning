@@ -1,6 +1,7 @@
 import plotly.express as px
 import plotly.io as pio
 pio.templates.default = 'plotly_white'
+ 
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
@@ -621,7 +622,12 @@ def _getPathAndStay(df_now,df_wifipos,df_path,pass_path,pass_count,stay_pos,stay
                 last_loc = loc
             wifi_last = row.a
 
-def Track2D_Restored(df,df_wifipos,df_path,show_freq = True,save = ''):
+def Track2D_Restored(df,df_wifipos,df_path,
+                     save_counts = '',
+                     showfig = True,
+                     save_fig = '',
+                     absolute = False,
+                     pureMode = False):
     mac_list = df.m.unique()
 
     pass_path= [] # [tuple1([x1,y1],[x2,y2]),tuple2([x1,y1],[x2,y2])...]"
@@ -629,33 +635,58 @@ def Track2D_Restored(df,df_wifipos,df_path,show_freq = True,save = ''):
     stay_pos = [] # [[x1,y1],[x2,y2]...]
     stay_count = []
     
-    for mac in tqdm(mac_list):
-
+    #for mac in tqdm(mac_list):
+    for mac in mac_list:
         df_now = utils.GetDfNow(df,mac)
         _getPathAndStay(df_now,df_wifipos,df_path,pass_path,pass_count,stay_pos,stay_count)
     
-    if save != '':
-        folder_path = os.path.join('wifi_track_data/dacang/track_data/',str(date)+f'/{save}')
+    if save_counts != '':
+        folder_path = os.path.join('wifi_track_data/dacang/track_data/',str(date)+f'/{save_counts}')
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
-        np.save(folder_path + f'/{save}_pass_path.npy',pass_path)
-        np.save(folder_path + f'/{save}_pass_count.npy',pass_count)
-        np.save(folder_path + f'/{save}_stay_pos.npy',stay_pos)
-        np.save(folder_path + f'/{save}_stay_count.npy',stay_count)
+        np.save(folder_path + f'/{save_counts}_pass_path.npy',pass_path)
+        np.save(folder_path + f'/{save_counts}_pass_count.npy',pass_count)
+        np.save(folder_path + f'/{save_counts}_stay_pos.npy',stay_pos)
+        np.save(folder_path + f'/{save_counts}_stay_count.npy',stay_count)
     
-    if show_freq:
-        Track_2D(pass_path,pass_count,stay_pos,stay_count)
+    
+    Track_2D(pass_path,
+             pass_count,
+             stay_pos,
+             stay_count,
+             absolute = absolute,
+             pureMode = pureMode,
+             showfig = showfig,
+             save_fig = save_fig)
 
-def Track_2D(pass_path, pass_count=None, stay_pos=None, stay_count=None):
+def Track_2D(pass_path, 
+             pass_count=None, 
+             stay_pos=None, 
+             stay_count=None,
+             absolute = False,
+             pureMode = False,
+             showfig = True,
+             save_fig = ''):
 
     fig = go.Figure()
     if pass_count != None:
-        # normalize counts
-        if max(pass_count)>50:
-            pass_count = utils.Normalize_arr(pass_count)
-            min_pass_count = min(pass_count) if min(pass_count)>0.1 else 0.1
-            pass_count = (1/min_pass_count)*pass_count
-        stay_count = utils.Normalize_arr(stay_count)*20
+        if not absolute:
+            # normalize counts
+            if max(pass_count)>10:
+                pass_count = utils.Normalize_arr(pass_count)
+                min_pass_count = min(pass_count) if min(pass_count)>0.1 else 0.1
+                pass_count = (1/min_pass_count)*pass_count
+            else:
+                pass_count = np.array(pass_count)/max(pass_count)
+            if len(stay_count) == 1:
+                stay_count.append(1)
+                stay_count = utils.Normalize_arr(stay_count)*8
+                stay_count = stay_count[:1]
+            elif len(stay_count) > 1:
+                stay_count = utils.Normalize_arr(stay_count)*8
+        else:
+            pass_count = np.array(pass_count)/10
+            stay_count = np.array(stay_count)/10
 
         #add move trace
         for i, path in enumerate(pass_path):
@@ -667,47 +698,76 @@ def Track_2D(pass_path, pass_count=None, stay_pos=None, stay_count=None):
                 showlegend=False,
                 mode='lines',
             ))
-        #add stay trace
-        xx = []
-        yy = []
-        for i,pos in enumerate(stay_pos):
-            xx.append(pos[0])
-            yy.append(pos[1])
-        fig.add_trace(
-            go.Scatter(x = xx,y = yy,
-                        marker_size = stay_count,
-                       mode="markers",
-                       marker_color = "firebrick",
-                       showlegend=False)
+        
+        
+        if len(stay_count)>0 :
+            #add stay trace
+            xx = []
+            yy = []
+            for i,pos in enumerate(stay_pos):
+                xx.append(pos[0])
+                yy.append(pos[1])
+            fig.add_trace(
+                go.Scatter(x = xx,y = yy,
+                            marker_size = stay_count,
+                        mode="markers",
+                        marker_line_color = "firebrick",
+                        marker_color = "firebrick",
+                        showlegend=False)
+            )
+    if not pureMode:
+        fig.update_layout(
+            xaxis=dict(range=[0, 400]),  # Set x-axis range
+            yaxis=dict(range=[0, 300]),  # Set y-axis range
+            width=400, height=300,
+            margin=dict(
+            l=10,
+            r=10,
+            b=10,
+            t=10,
+            pad=4
+            ),
+            
         )
 
-    fig.update_layout(
-        xaxis=dict(range=[0, 400]),  # Set x-axis range
-        yaxis=dict(range=[0, 300]),  # Set y-axis range
-        width=400, height=300,
-        margin=dict(
-        l=10,
-        r=10,
-        b=10,
-        t=10,
-        pad=4
-        ),
-        
-    )
-
-    fig.add_layout_image(
-            dict(
-                source=background_img,
-                xref="x", yref="y",
-                x=0, y=0,  #position of the upper left corner of the image in subplot 1,1
-                sizex= 400,sizey= 300, #sizex, sizey are set by trial and error
-                xanchor="left",
-                yanchor="bottom",
-                sizing="stretch",
-                layer="below",
-                opacity=0.3)
-    )
-    fig.show()
+        fig.add_layout_image(
+                dict(
+                    source=background_img,
+                    xref="x", yref="y",
+                    x=0, y=0,  #position of the upper left corner of the image in subplot 1,1
+                    sizex= 400,sizey= 300, #sizex, sizey are set by trial and error
+                    xanchor="left",
+                    yanchor="bottom",
+                    sizing="stretch",
+                    layer="below",
+                    opacity=0.3)
+        )
+    else:
+        fig.update_layout(
+            xaxis=dict(range=[0, 400],
+                       showgrid = False,
+                        showline = False,
+                        tickvals = []
+                        ),
+            yaxis=dict(range=[0, 300],
+                       showgrid = False,
+                        showline = False,
+                        tickvals = []),
+            width=100, height=75,
+            margin=dict(
+            l=0,
+            r=0,
+            b=0,
+            t=0,
+            pad=4),
+            
+            
+        )
+    if save_fig != '':
+        fig.write_image(save_fig, engine='orca')
+    #pio.write_image(fig,'111.jpg')
+    if showfig:
+        fig.show()
 
 def Scatter_Matrix_test(df,dimentions,color = '',color_scale = 'Bluered'):
     fig = px.scatter_matrix(df,dimensions=dimentions,
