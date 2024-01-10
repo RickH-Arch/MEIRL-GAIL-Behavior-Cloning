@@ -33,7 +33,7 @@ class DeepMEIRL_FC(nn.Module):
         self.net = []
         for l in layers:
             self.net.append(nn.Linear(n_input,l))
-            self.net.append(nn.ReLU())
+            self.net.append(nn.Tanh())
             n_input = l
         self.net.append(nn.Linear(n_input,1))
         self.net.append(nn.Tanh())
@@ -66,23 +66,26 @@ class DMEIRL:
         #self.optimizer = self.model.optimizer
 
     def train(self,n_epochs, save_rewards = True, demo = False,showInfo = False):
-        self.rewards_list = []
+        self.rewards = []
         svf = self.StateVisitationFrequency()
+        svf_np = svf.detach().cpu().numpy()
+        com_last = 100
         rewards = self.model(self.features).flatten()
-        self.rewards_list.append(rewards.detach().cpu().numpy())
+        self.rewards.append(rewards.detach().cpu().numpy())
+        self.exploded = False
         
         for i in tqdm(range(n_epochs)):
             if not demo:
                 print("=============================epoch{}=============================".format(i+1))
             if i != 0:
                 rewards = self.model(self.features).flatten()
-                self.rewards_list.append(rewards.detach().cpu().numpy())
+                self.rewards.append(rewards.detach().cpu().numpy())
 
             #save rewards
             if save_rewards and not demo:
                 self.SaveRewards(i)
 
-            # #show compare 
+            #show compare 
             # if i > 0 and not demo:
             #     com_last = self.CompareRewards(com_last)
             #     if showInfo:
@@ -95,6 +98,8 @@ class DMEIRL:
             policy = value_iteration(0.0001,self.world,rewards.detach(),self.world.discount)
             exp_svf = self.Expected_StateVisitationFrequency(policy)
             r_grad = svf - exp_svf
+            r_grad_np = r_grad.detach().cpu().numpy()
+            print("svf delta:",np.mean(r_grad_np))
 
             #update model
             self.optimizer.zero_grad()

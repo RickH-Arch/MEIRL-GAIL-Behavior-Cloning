@@ -18,8 +18,8 @@ print("GridWorld initialized")
 
 #------------------------------------Initialize DMEIRL------------------------------------------
 
-dme = DMEIRL(world,layers=(50,30),lr=0.001,clip_norm = 1)
+dme = DMEIRL(world,layers=(60,30),lr=0.002,clip_norm = 1)
 
 #------------------------------------Train------------------------------------------
 
-dme.train(n_epochs=5000)
+dme.train(n_epochs=10000)
