@@ -6,9 +6,7 @@ from DMEIRL.value_iteration import value_iteration
 import numpy as np
 import os
 from utils import utils
-
-# from torch.cuda.amp import autocast, GradScaler
-# scaler = GradScaler()
+from tensorboardX import SummaryWriter
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -63,7 +61,7 @@ class DMEIRL:
         if load != "":
             self.model.load_state_dict(torch.load(load))
 
-        #self.optimizer = self.model.optimizer
+        self.writer = SummaryWriter("./run/DMEIRL")
 
     def train(self,n_epochs, save = True, demo = False,showInfo = False):
         self.rewards = []
@@ -96,8 +94,9 @@ class DMEIRL:
             exp_svf = self.Expected_StateVisitationFrequency(policy)
             r_grad = svf - exp_svf
             r_grad_np = r_grad.detach().cpu().numpy()
-
-            print("svf delta:",np.mean(r_grad_np.__abs__()))
+            svf_delta = np.mean(r_grad_np.__abs__())
+            print("svf delta:",svf_delta)
+            self.writer.add_scalar('SVF delta/Train',svf_delta,i)
 
             #update model
             self.optimizer.zero_grad()
