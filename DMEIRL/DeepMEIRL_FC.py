@@ -65,7 +65,7 @@ class DMEIRL:
 
         #self.optimizer = self.model.optimizer
 
-    def train(self,n_epochs, save_rewards = True, demo = False,showInfo = False):
+    def train(self,n_epochs, save = True, demo = False,showInfo = False):
         self.rewards = []
         svf = self.StateVisitationFrequency()
         svf_np = svf.detach().cpu().numpy()
@@ -74,7 +74,7 @@ class DMEIRL:
         self.rewards.append(rewards.detach().cpu().numpy())
         self.exploded = False
         
-        for i in tqdm(range(n_epochs)):
+        for i in range(n_epochs):
             if not demo:
                 print("=============================epoch{}=============================".format(i+1))
             if i != 0:
@@ -82,7 +82,7 @@ class DMEIRL:
                 self.rewards.append(rewards.detach().cpu().numpy())
 
             #save rewards
-            if save_rewards and not demo:
+            if save and not demo:
                 self.SaveRewards(i)
 
             #show compare 
@@ -90,16 +90,14 @@ class DMEIRL:
             #     com_last = self.CompareRewards(com_last)
             #     if showInfo:
             #         print(f"compare: {com_last}")
-            
-            if not demo:
-                print(f"epoch{i+1} policy value_iteration start")
 
             #compute grad
             policy = value_iteration(0.0001,self.world,rewards.detach(),self.world.discount)
             exp_svf = self.Expected_StateVisitationFrequency(policy)
             r_grad = svf - exp_svf
             r_grad_np = r_grad.detach().cpu().numpy()
-            print("svf delta:",np.mean(r_grad_np))
+
+            print("svf delta:",np.mean(r_grad_np.__abs__()))
 
             #update model
             self.optimizer.zero_grad()
@@ -111,7 +109,7 @@ class DMEIRL:
             self.optimizer.step()
             
             #save model
-            if not demo:
+            if save and not demo:
                 self.SaveModel(i)
 
         with torch.no_grad():
