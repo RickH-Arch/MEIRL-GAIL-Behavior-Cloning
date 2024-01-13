@@ -12,10 +12,15 @@ current_time = datetime.now()
 date = str(current_time.month)+str(current_time.day)
 
 class Experts:
-    def __init__(self,trajs_file_path,width,height):
+    def __init__(self,width,height,trajs_file_path = None,df_trajs = None):
         self.width = width
         self.height = height
-        self.df_trajs_all = self.ReadExpertTrajs(trajs_file_path)
+        
+        if trajs_file_path:
+            self.df_trajs_all = self.ReadExpertTrajs(trajs_file_path)
+        elif df_trajs:
+            self.df_trajs_all = df_trajs
+        
         self.trajs_all = self.df_trajs_all['trajs'].tolist()
         self.traj_all_avg_length = int(np.mean(self.df_trajs_all['trajs'].apply(lambda x:len(x))))
         self.mac_list = self.df_trajs_all['m'].tolist()

@@ -45,7 +45,7 @@ class DeepMEIRL_FC(nn.Module):
         return out
     
 class DMEIRL:
-    def __init__(self,world,layers = (50,30),load = "",lr = 0.001,weight_decay = 1,clip_norm = -1):
+    def __init__(self,world,layers = (50,30),load = "",lr = 0.001,weight_decay = 1,clip_norm = -1,log = ''):
         self.clip_norm = clip_norm
         
         self.world = world
@@ -61,12 +61,13 @@ class DMEIRL:
         if load != "":
             self.model.load_state_dict(torch.load(load))
 
-        self.writer = SummaryWriter("./run/DMEIRL")
+        self.writer = None
+        if log != "":
+            self.writer = SummaryWriter(f"./run/DMEIRL_{log}")
 
     def train(self,n_epochs, save = True, demo = False,showInfo = False):
         self.rewards = []
         svf = self.StateVisitationFrequency()
-        svf_np = svf.detach().cpu().numpy()
         com_last = 100
         rewards = self.model(self.features).flatten()
         self.rewards.append(rewards.detach().cpu().numpy())
@@ -94,9 +95,11 @@ class DMEIRL:
             exp_svf = self.Expected_StateVisitationFrequency(policy)
             r_grad = svf - exp_svf
             r_grad_np = r_grad.detach().cpu().numpy()
-            svf_delta = np.mean(r_grad_np.__abs__())
+            r_grad_np = r_grad_np.__abs__()
+            svf_delta = np.mean(r_grad_np)
             print("svf delta:",svf_delta)
-            self.writer.add_scalar('SVF delta/Train',svf_delta,i)
+            if self.writer:
+                self.writer.add_scalar('SVF delta/Train',svf_delta,i)
 
             #update model
             self.optimizer.zero_grad()
