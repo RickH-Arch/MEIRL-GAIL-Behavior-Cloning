@@ -154,6 +154,7 @@ class GridWorld_trajGen:
         df_trajs = pd.DataFrame({'m':m,'trajs':trajs})
         if save:
             df_trajs.to_csv(f'demo_expert_trajs_{utils.date}.csv',index=False)
+        self.df_trajs = df_trajs
         return df_trajs
     
     def feature_vector(self, state, discrete=True):

@@ -29,7 +29,8 @@ class GridWorld:
         self.active_all = active_all
         
          #-------专家轨迹----------
-        self.experts = Experts(expert_traj_filePath,self.width,self.height)
+        if expert_traj_filePath:
+            self.experts = Experts(self.width,self.height,trajs_file_path=expert_traj_filePath)
 
         #------initialize states----------
         self.count_grid = self.GetCountGrid()#每个网格被经过的次数
