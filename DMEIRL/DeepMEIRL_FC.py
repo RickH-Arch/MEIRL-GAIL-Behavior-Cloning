@@ -36,9 +36,12 @@ class DeepMEIRL_FC(nn.Module):
         self.net.append(nn.Linear(n_input,1))
         #self.net.append(nn.Tanh())
         self.net = nn.Sequential(*self.net)
-        
-        #self.optimizer = optim.Adam(self.net.parameters(),lr=self.lr,weight_decay=l2)#weight_decay = l2(权值衰减)
-        
+
+        #Xavier Initialize
+        for m in self.net:
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                nn.init.constant_(m.bias, 0.0)
     
     def forward(self,features):
         out = self.net(features)
