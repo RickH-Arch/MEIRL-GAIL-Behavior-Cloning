@@ -31,10 +31,10 @@ class DeepMEIRL_FC(nn.Module):
         self.net = []
         for l in layers:
             self.net.append(nn.Linear(n_input,l))
-            self.net.append(nn.Tanh())
+            self.net.append(nn.ELU())
             n_input = l
         self.net.append(nn.Linear(n_input,1))
-        self.net.append(nn.Tanh())
+        #self.net.append(nn.Tanh())
         self.net = nn.Sequential(*self.net)
         
         #self.optimizer = optim.Adam(self.net.parameters(),lr=self.lr,weight_decay=l2)#weight_decay = l2(权值衰减)
@@ -91,7 +91,7 @@ class DMEIRL:
             #         print(f"compare: {com_last}")
 
             #compute grad
-            policy = value_iteration(0.0001,self.world,rewards.detach(),self.world.discount)
+            policy = value_iteration(0.001,self.world,rewards.detach(),self.world.discount)
             exp_svf = self.Expected_StateVisitationFrequency(policy)
             r_grad = svf - exp_svf
             r_grad_np = r_grad.detach().cpu().numpy()
@@ -99,7 +99,10 @@ class DMEIRL:
             svf_delta = np.mean(r_grad_np)
             print("svf delta:",svf_delta)
             if self.writer:
-                self.writer.add_scalar('SVF delta/Train',svf_delta,i)
+                self.writer.add_scalar('SVF delta mean/Train',svf_delta,i)
+                self.writer.add_scalar('SVF delta square mean/Train',np.mean(r_grad_np**2),i)
+                self.writer.add_scalar('SVF delta max/Train',np.max(r_grad_np),i)
+                self.writer.add_scalar('SVF delta min/Train',np.min(r_grad_np),i)
 
             #update model
             self.optimizer.zero_grad()
