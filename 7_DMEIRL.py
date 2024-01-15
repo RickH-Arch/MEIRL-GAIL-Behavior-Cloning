@@ -18,7 +18,7 @@ print("GridWorld initialized")
 
 #------------------------------------Initialize DMEIRL------------------------------------------
 
-dme = DMEIRL(world,layers=(60,30,30),lr=0.0001,clip_norm=0.1,weight_decay=0.1)
+dme = DMEIRL(world,layers=(60,30,30),lr=0.0001,clip_norm=0.1,weight_decay=0.1,log='0115')
 
 #------------------------------------Train------------------------------------------
 
