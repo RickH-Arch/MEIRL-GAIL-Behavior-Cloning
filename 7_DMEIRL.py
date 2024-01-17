@@ -5,7 +5,7 @@ from DMEIRL.DeepMEIRL_FC import DMEIRL
 #------------------------------------Initialize Grid World------------------------------------------
 
 env_folder_path = "wifi_track_data/dacanggrid_data/envs_grid/1230"
-feature_folder_path = "wifi_track_data/dacang/grid_data/features_grid/1230"
+feature_folder_path = "wifi_track_data/dacang/grid_data/features_grid/1230_80x60"
 expert_traj_path = "wifi_track_data/dacang/track_data/trajs_1230.csv"
 
 world = GridWorld(features_folderPath=feature_folder_path,
