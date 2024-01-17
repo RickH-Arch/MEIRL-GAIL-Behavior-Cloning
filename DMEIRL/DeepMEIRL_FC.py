@@ -41,7 +41,7 @@ class DeepMEIRL_FC(nn.Module):
         for m in self.net:
             if isinstance(m, nn.Linear):
                 nn.init.xavier_uniform_(m.weight)
-                nn.init.constant_(m.bias, 0.0)
+                #nn.init.constant_(m.bias, 0.0)
     
     def forward(self,features):
         out = self.net(features)
@@ -103,7 +103,7 @@ class DMEIRL:
             print("svf delta:",svf_delta)
             if self.writer:
                 self.writer.add_scalar('SVF delta mean/Train',svf_delta,i)
-                self.writer.add_scalar('SVF delta square mean/Train',np.mean(r_grad_np**2),i)
+                self.writer.add_scalar('SVF delta square sum/Train',np.sum(r_grad_np**2),i)
                 self.writer.add_scalar('SVF delta max/Train',np.max(r_grad_np),i)
                 self.writer.add_scalar('SVF delta min/Train',np.min(r_grad_np),i)
 

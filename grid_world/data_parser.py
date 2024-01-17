@@ -65,11 +65,11 @@ class DataParser:
             states = state_list[i]
             pairs = grid_utils.StatesToStateActionPairs(states)
             for pair in pairs:
-                pair[0] = self.CoordToState(pair[0])
+                pair[0] = grid_utils.CoordToState(pair[0],self.width)
             pairs_list.append(pairs)
         pairs_dict = dict(zip(mac_list, pairs_list))
         df = pd.DataFrame({"m":mac_list,'trajs':pairs_list})
-        df.to_csv(f'wifi_track_data/dacang/track_data/trajs_{self.date}.csv',index=False)
+        df.to_csv(f'wifi_track_data/dacang/track_data/trajs_{self.date}_{self.width}x{self.height}.csv',index=False)
         return df
     
     def ParseEnvironments(self,image_list,feature_name_list):
@@ -91,7 +91,7 @@ class DataParser:
             for j in range(0,image_array.shape[1]):
                 env_array[i,j] = np.sum(image_array[i,j,:])
 
-        folder_path = os.path.join('wifi_track_data/dacang/grid_data/envs_grid',self.date)
+        folder_path = os.path.join('wifi_track_data/dacang/grid_data/envs_grid',f"{self.date}_{self.width}x{self.height}")
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
         np.save(folder_path+f"/{feature_name}_env.npy",env_array)
@@ -105,7 +105,7 @@ class DataParser:
 
         feature_array = utils.Normalize_2DArr(feature_array)
 
-        folder_path = os.path.join('wifi_track_data/dacang/grid_data/features_grid',self.date)
+        folder_path = os.path.join('wifi_track_data/dacang/grid_data/features_grid',f"{self.date}_{self.width}x{self.height}")
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
         np.save(folder_path+f"/{feature_name}_feature.npy",feature_array)
