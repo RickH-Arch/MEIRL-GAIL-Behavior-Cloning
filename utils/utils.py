@@ -9,6 +9,7 @@ import os
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.metrics import calinski_harabasz_score
+from sklearn.preprocessing import StandardScaler
 
 from datetime import datetime
 current_time = datetime.now()
@@ -27,6 +28,12 @@ def Normalize_arr(arr):
     max_val = np.max(arr)
     normalized_arr = (arr - min_val) / (max_val - min_val)
     return normalized_arr
+
+def Z_score(arr):
+    arr = arr.reshape(-1,1) 
+    scaler = StandardScaler()
+    scaler.fit(arr)
+    return scaler.transform(arr).flatten()
     
 def Normalize_df(df_in,cols = [],mul_index = 10):
     df = df_in.copy()
