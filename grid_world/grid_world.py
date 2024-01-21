@@ -17,25 +17,39 @@ class GridWorld:
                  features_folderPath = None,
                  states_features = None,
                 expert_traj_filePath = None,
+                expert_trajs = None,
                  width = 100,height = 75,
                  trans_prob = 0.9,
                  discount = 0.9,
-                 active_all = False) -> None:
+                 active_all = False,
+                 manual_deact_states = [],
+                 real_reward_mat = []) -> None:
         self.width = width
         self.height = height
         
         self.trans_prob = trans_prob
         self.discount = discount
         self.active_all = active_all
+        self.manual_deact_states = manual_deact_states
         
-         #-------专家轨迹----------
-        if expert_traj_filePath:
-            self.experts = Experts(self.width,self.height,trajs_file_path=expert_traj_filePath)
+        #-------专家轨迹----------
+        self.experts = None
+        try:
+            if expert_traj_filePath:
+                self.experts = Experts(self.width,self.height,trajs_file_path=expert_traj_filePath)
+            elif any(expert_trajs):
+                self.experts = Experts(self.width,self.height,df_trajs=expert_trajs)
+        except:
+            pass
+             
+        #print("experts didn't initialize")
 
+        self.count_grid = np.zeros((self.height,self.width))
+        if self.experts:
+            self.count_grid = self.GetCountGrid()#每个网格被经过的次数
+            #self.state_adjacent_mat = self.GetStateAdjacentMat()
         #------initialize states----------
-        self.count_grid = self.GetCountGrid()#每个网格被经过的次数
-        self.p_grid = self.count_grid/np.sum(self.count_grid)#每个网格被经过的概率
-
+        
         self.states_all = self.GetAllStates()
         self.n_states_all = len(self.states_all)
 
@@ -56,24 +70,23 @@ class GridWorld:
         else:
             if states_features:
                 self.states_features = states_features
+                self.features = self.SplitFeatures(self.states_features)
             else:
                 raise Exception("feature_folderPath and states_features can't be None at the same time")
             
         #特征列表，转换字典
         self.features_arr,self.fid_state,self.state_fid = self.GetAvtiveFeatureArr(self.states_features)
-        
         #transition probability
-        self.state_adjacent_mat = self.GetStateAdjacentMat()
         self.dynamics = self.GetTransitionMat()
         #仅记录active的dynamics，系数需要经过state_fid转换
         self.dynamics_fid = self.GetTransitionMatActived()
 
-        #get time
-        current_time = datetime.now()
-        self.date = str(current_time.month)+str(current_time.day)
-
         #helper
         self.dynamics_track = []
+
+        #real reward matrix, used for evaluate trained reward
+        self.real_reward_arr = self.GetRealRewardArr(real_reward_mat)
+    
 
 #------------------------------------Get Method------------------------------------------
     def GetCountGrid(self):
@@ -87,9 +100,17 @@ class GridWorld:
         return count_grid
 
     def GetAllActiveStates(self):
-        if self.active_all:
-            return self.states_all
         states = []
+        if self.active_all:
+            return self.states_all.copy()
+        
+        #如果没有专家轨迹，那么所有不在manual_deact_states中的状态都是active
+        if not self.experts:
+            for s in self.states_all:
+                if s not in self.manual_deact_states:
+                    states.append(s)
+            return states
+        #如果有专家轨迹，那么所有在专家轨迹中出现过的状态都是active，且忽略manual_deact_states
         for i in range(self.height):
             for j in range(self.width):
                 if self.count_grid[i,j]>0:
@@ -190,9 +211,30 @@ class GridWorld:
                 fid_state[len(fid_state)] = state
                 state_fid[state] = len(state_fid)
         return np.array(feature_arr),fid_state,state_fid
+    
+    def GetRealRewardArr(self,real_reward_mat):
+        if len(real_reward_mat) == 0:
+            return []
+        reward_arr = []
+        for state in self.states_active:
+            index = self.StateToCoord(state)
+            reward_arr.append(real_reward_mat[index[1],index[0]])
+        reward_arr = np.array(reward_arr)
+        reward_arr = utils.Normalize_arr(reward_arr)
+        return reward_arr
 
 #------------------------------------Init Function------------------------------------------ 
-    
+    def SplitFeatures(self,states_features):
+        features = {}
+        for state,fs in states_features.items():
+            for i,f in enumerate(fs):
+                if i not in features:
+                    features[i] = np.zeros((self.height,self.width))
+                coord = self.StateToCoord(state)
+                features[i][coord[1],coord[0]] = f
+        return features
+
+
     def ReadEnvironments(self,folder_path):
         environments = {}
         file_names = os.listdir(folder_path)
@@ -311,6 +353,10 @@ class GridWorld:
             state = self.fid_state[i]
             coord = self.StateToCoord(state)
             rewards_matrix[coord[1],coord[0]] = rewards[i]
+        for i in range(self.height):
+            for j in range(self.width):
+                if rewards_matrix[i,j] == 0:
+                    rewards_matrix[i,j] = np.nan
         return rewards_matrix
 
 

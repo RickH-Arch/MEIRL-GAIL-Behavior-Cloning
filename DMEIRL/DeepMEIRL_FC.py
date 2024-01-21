@@ -35,6 +35,7 @@ class DeepMEIRL_FC(nn.Module):
             n_input = l
         self.net.append(nn.Linear(n_input,1))
         #self.net.append(nn.Tanh())
+        self.net.append(nn.Sigmoid())
         self.net = nn.Sequential(*self.net)
 
         #Xavier Initialize
@@ -48,15 +49,15 @@ class DeepMEIRL_FC(nn.Module):
         return out
     
 class DMEIRL:
-    def __init__(self,world,layers = (50,30),load = "",lr = 0.001,weight_decay = 1,clip_norm = -1,log = ''):
+    def __init__(self,world,layers = (50,30),load = "",lr = 0.001,weight_decay = 1,clip_norm = -1,log = '',log_dir = 'run'):
         self.clip_norm = clip_norm
         
         self.world = world
         self.trajs = world.experts.trajs
         self.features = torch.from_numpy(world.features_arr).float().to(device)
         
-        self.dynamics = torch.from_numpy(np.transpose(world.dynamics_fid,(2,1,0))).float().to(device)
-
+        #self.dynamics = torch.from_numpy(np.transpose(world.dynamics_fid,(2,1,0))).float().to(device)
+        self.dynamics = torch.from_numpy(world.dynamics_fid).float().to(device)
         self.model = DeepMEIRL_FC(self.features.shape[1],layers = layers)
         self.model = self.model.to(device)
         self.optimizer = optim.Adam(self.model.parameters(),lr=lr,weight_decay=weight_decay)#momentum 动量,weight_decay = l2(权值衰减)
@@ -66,7 +67,7 @@ class DMEIRL:
 
         self.writer = None
         if log != "":
-            self.writer = SummaryWriter(f"./run/DMEIRL_{log}")
+            self.writer = SummaryWriter(f"./{log_dir}/DMEIRL_{log}_lr{lr}_wd{weight_decay}_clip{clip_norm}_l{layers}")
 
     def train(self,n_epochs, save = True, demo = False,showInfo = False):
         self.rewards = []
@@ -76,7 +77,7 @@ class DMEIRL:
         self.rewards.append(rewards.detach().cpu().numpy())
         self.exploded = False
         
-        for i in range(n_epochs):
+        for i in tqdm(range(n_epochs)):
             if not demo:
                 print("=============================epoch{}=============================".format(i+1))
             if i != 0:
@@ -85,27 +86,30 @@ class DMEIRL:
 
             #save rewards
             if save and not demo:
-                self.SaveRewards(i)
-
-            #show compare 
-            # if i > 0 and not demo:
-            #     com_last = self.CompareRewards(com_last)
-            #     if showInfo:
-            #         print(f"compare: {com_last}")
+                self.SyncRewards(i)
 
             #compute grad
-            policy = value_iteration(0.001,self.world,rewards.detach(),self.world.discount)
+            policy = value_iteration(0.001,self.world,rewards.detach(),self.world.discount,demo=demo)
             exp_svf = self.Expected_StateVisitationFrequency(policy)
+            #exp_svf_np = exp_svf.detach().cpu().numpy()
+            #exp_svf = self.Expected_StateVisitationFrequency_2(policy)
+            #exp_svf = torch.from_numpy(exp_svf).float().to(device)
             r_grad = svf - exp_svf
             r_grad_np = r_grad.detach().cpu().numpy()
             r_grad_np = r_grad_np.__abs__()
             svf_delta = np.mean(r_grad_np)
-            print("svf delta:",svf_delta)
+            #if not demo:
+                #print("svf delta:",svf_delta)
+            svf_np = svf.detach().cpu().numpy()
+            exp_svf_np = exp_svf.detach().cpu().numpy()
+            mse = self.CompareSVF(svf_np,exp_svf_np)
             if self.writer:
+                self.writer.add_scalar('reward loss',self.CompareWithRealReward(self.rewards[-1]),i)
                 self.writer.add_scalar('SVF delta mean/Train',svf_delta,i)
                 self.writer.add_scalar('SVF delta square sum/Train',np.sum(r_grad_np**2),i)
                 self.writer.add_scalar('SVF delta max/Train',np.max(r_grad_np),i)
                 self.writer.add_scalar('SVF delta min/Train',np.min(r_grad_np),i)
+                self.writer.add_scalar('SVF delta mse/Train',mse,i)
 
             #update model
             self.optimizer.zero_grad()
@@ -118,12 +122,12 @@ class DMEIRL:
             
             #save model
             if save and not demo:
-                self.SaveModel(i)
+                self.SyncModel(i)
 
         with torch.no_grad():
             rewards = self.model.forward(self.features).flatten()
 
-        return rewards.detach().cpu().numpy()
+        return rewards.detach().cpu().numpy(),self.rewards
 
     def StateVisitationFrequency(self):
         svf = torch.zeros(self.world.n_states_active,dtype=torch.float32).to(device)
@@ -145,37 +149,56 @@ class DMEIRL:
             prob_initial_state = prob_initial_state/self.world.experts.trajs_count
 
             #Compute 𝜇
+            d = torch.from_numpy(np.transpose(self.world.dynamics_fid,(2,1,0))).float().to(device)
             mu = prob_initial_state.repeat(self.world.experts.traj_avg_length,1)
             x = (policy[:,:,np.newaxis]*self.dynamics).sum(1)
             for t in range(1,self.world.experts.traj_avg_length):
                 mu[t,:] = torch.matmul(mu[t-1,:],x)
 
         return mu.sum(dim = 0)
-        
     
-    def SaveRewards(self,epoch):
+    def Expected_StateVisitationFrequency_2(self,policy):
+        # mu[s,t] is the probability of visiting state s at time t
+        policy = policy.cpu().numpy()
+        mu = np.zeros([self.world.n_states_active,self.world.experts.traj_avg_length])
+        for traj in self.world.experts.trajs:
+            index = self.world.state_fid[traj[0][0]]
+            mu[index,0] += 1
+        mu[:,0] = mu[:,0]/self.world.experts.trajs_count
+
+        for s in range(self.world.n_states_active):
+            for t in range(self.world.experts.traj_avg_length-1):
+                mu[s,t+1] = sum([sum([mu[pre_s,t]*self.dynamics[pre_s,a1,s]*policy[pre_s,a1] for a1 in range(self.world.n_actions)])
+                                 for pre_s in range(self.world.n_states_active)])
+        return mu.sum(axis=1)
+    
+    def SyncRewards(self,epoch):
         last_file = f"wifi_track_data/dacang/train_data/rewards_{self.model.name}_epoch{epoch}_{utils.date}.npy"
         if os.path.exists(last_file):
             os.remove(last_file)
         np.save(f"wifi_track_data/dacang/train_data/rewards_{self.model.name}_epoch{epoch+1}_{utils.date}.npy" ,self.rewards)
     
-    def SaveModel(self,epoch):
+    def SyncModel(self,epoch):
         last_model = f"wifi_track_data/dacang/train_data/model_{self.model.name}_epochs{epoch}_{utils.date}.pth"
         if os.path.exists(last_model):
             os.remove(last_model)
         torch.save(self.model.state_dict(),f"wifi_track_data/dacang/train_data/model_{self.model.name}_epochs{epoch+1}_{utils.date}.pth")
 
-    def CompareRewards(self,com_last):
+    def SaveModel(self,path):
+        torch.save(self.model.state_dict(),path)
+
+    def CompareSVF(self,svf1,svf2):
         compare = nn.MSELoss()
         with torch.no_grad():
-            com = compare(torch.from_numpy(self.rewards[-1]).float(),torch.from_numpy(self.rewards[-2]).float())
-            com = com*100000000
-            print(f"=====reward compare: {com-com_last}=====")
-            if com - com_last > 1 and not self.exploded:
-                np.save(f"wifi_track_data/dacang/train_data/rewards_beforeExplode_{self.model.name}_epoch{i+1}_{utils.date}.npy" ,self.rewards)
-                torch.save(self.model.state_dict(),f"wifi_track_data/dacang/train_data/model_beforeExploded_{self.model.name}_epochs{i+1}_{utils.date}.pth")
-                self.exploded = True
+            com = compare(torch.from_numpy(svf1).float(),torch.from_numpy(svf2).float())
         return com
+    
+    def CompareWithRealReward(self,reward_now):
+        compare = nn.MSELoss()
+        with torch.no_grad():
+            com = compare(torch.from_numpy(reward_now).float(),torch.from_numpy(self.world.real_reward_arr).float())
+            #print(f"=====reward compare: {com}=====")
+            return com
 
 
 

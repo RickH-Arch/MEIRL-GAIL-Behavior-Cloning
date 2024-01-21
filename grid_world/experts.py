@@ -18,7 +18,7 @@ class Experts:
         
         if trajs_file_path:
             self.df_trajs_all = self.ReadExpertTrajs(trajs_file_path)
-        elif df_trajs:
+        elif len(df_trajs)>0:
             self.df_trajs_all = df_trajs
         
         self.trajs_all = self.df_trajs_all['trajs'].tolist()

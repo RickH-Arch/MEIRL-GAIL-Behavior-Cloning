@@ -14,7 +14,7 @@ class DataParser:
     record active state, convert path to state action pairs, parse enviroment factors
     actions: 0:stay,1:up,2:down,3:left,4:right
     '''
-    def __init__(self,df_wifipos,df_path,width = 100,height = 75) -> None:
+    def __init__(self,df_wifipos = None,df_path = None,width = 100,height = 75) -> None:
         self.width = width
         self.height = height
         self.empty_grid = np.zeros((height,width))
@@ -76,7 +76,7 @@ class DataParser:
         for i in range(len(image_list)):
             self.ParseEnvironment(image_list[i],feature_name_list[i])
     
-    def ParseEnvironment(self,image,feature_name):
+    def ParseEnvironment(self,image,feature_name,save_path = 'wifi_track_data/dacang/grid_data'):
         '''
         args[0]:the labled rgb Image
         args[1]:name of the parsing environment 
@@ -91,7 +91,7 @@ class DataParser:
             for j in range(0,image_array.shape[1]):
                 env_array[i,j] = np.sum(image_array[i,j,:])
 
-        folder_path = os.path.join('wifi_track_data/dacang/grid_data/envs_grid',f"{self.date}_{self.width}x{self.height}")
+        folder_path = os.path.join(save_path,'envs_grid',f"{self.date}_{self.width}x{self.height}")
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
         np.save(folder_path+f"/{feature_name}_env.npy",env_array)
@@ -105,7 +105,7 @@ class DataParser:
 
         feature_array = utils.Normalize_2DArr(feature_array)
 
-        folder_path = os.path.join('wifi_track_data/dacang/grid_data/features_grid',f"{self.date}_{self.width}x{self.height}")
+        folder_path = os.path.join(save_path,'features_grid',f"{self.date}_{self.width}x{self.height}")
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
         np.save(folder_path+f"/{feature_name}_feature.npy",feature_array)
