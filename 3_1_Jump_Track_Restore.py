@@ -62,6 +62,16 @@ def TrackRestore(df,df_wifipos):
                                     dis_thre = distance_thre, 
                                     speed_thre = speed_thre,
                                     label = f'{epoch}_virtual')
+    enforce_count = 0
+    for l in enforceTrack_list:
+        if len(l)>0:
+            enforce_count+=1
+    print(f"强制生成虚拟探针：{enforce_count}个")
+    normal_count = 0
+    for l in normalTrack_list:
+        if len(l)>0:
+            normal_count+=1
+    print(f"普通生成虚拟探针：{normal_count}个")
     newTracker_count = len(df_wifiposNew) - len(df_wifipos)
     #如果没有新的虚拟探针了，则返回
     if newTracker_count == 0:
