@@ -76,8 +76,11 @@ class DMEIRL:
         rewards = self.model(self.features).flatten()
         self.rewards.append(rewards.detach().cpu().numpy())
         self.exploded = False
+
+        last_mse = 10000
+        last_max = 10000
         
-        for i in tqdm(range(n_epochs)):
+        for i in range(n_epochs):
             if not demo:
                 print("=============================epoch{}=============================".format(i+1))
             if i != 0:
@@ -91,23 +94,20 @@ class DMEIRL:
             #compute grad
             policy = value_iteration(0.001,self.world,rewards.detach(),self.world.discount,demo=demo)
             exp_svf = self.Expected_StateVisitationFrequency(policy)
-            #exp_svf_np = exp_svf.detach().cpu().numpy()
-            #exp_svf = self.Expected_StateVisitationFrequency_2(policy)
-            #exp_svf = torch.from_numpy(exp_svf).float().to(device)
             r_grad = svf - exp_svf
             r_grad_np = r_grad.detach().cpu().numpy()
             r_grad_np = r_grad_np.__abs__()
-            svf_delta = np.mean(r_grad_np)
-            #if not demo:
-                #print("svf delta:",svf_delta)
+            
             svf_np = svf.detach().cpu().numpy()
             exp_svf_np = exp_svf.detach().cpu().numpy()
             mse = self.CompareSVF(svf_np,exp_svf_np)
+            if not demo:
+                print("svf delta:",mse)
+            max = np.max(r_grad_np)
             if self.writer:
-                self.writer.add_scalar('reward loss',self.CompareWithRealReward(self.rewards[-1]),i)
-                self.writer.add_scalar('SVF delta mean/Train',svf_delta,i)
-                self.writer.add_scalar('SVF delta square sum/Train',np.sum(r_grad_np**2),i)
-                self.writer.add_scalar('SVF delta max/Train',np.max(r_grad_np),i)
+                if len(self.world.real_reward_arr)>0:
+                    self.writer.add_scalar('reward loss',self.CompareWithRealReward(self.rewards[-1]),i)
+                self.writer.add_scalar('SVF delta max/Train',max,i)
                 self.writer.add_scalar('SVF delta min/Train',np.min(r_grad_np),i)
                 self.writer.add_scalar('SVF delta mse/Train',mse,i)
 
@@ -122,7 +122,13 @@ class DMEIRL:
             
             #save model
             if save and not demo:
-                self.SyncModel(i)
+                if last_mse>mse:
+                    self.SyncModel_MinMse(i,mse)
+                    last_mse = mse
+                if last_max>max:
+                    self.SyncModel_MinMax(i,max)
+                    last_max = max
+
 
         with torch.no_grad():
             rewards = self.model.forward(self.features).flatten()
@@ -178,11 +184,23 @@ class DMEIRL:
             os.remove(last_file)
         np.save(f"wifi_track_data/dacang/train_data/rewards_{self.model.name}_epoch{epoch+1}_{utils.date}.npy" ,self.rewards)
     
-    def SyncModel(self,epoch):
-        last_model = f"wifi_track_data/dacang/train_data/model_{self.model.name}_epochs{epoch}_{utils.date}.pth"
-        if os.path.exists(last_model):
-            os.remove(last_model)
-        torch.save(self.model.state_dict(),f"wifi_track_data/dacang/train_data/model_{self.model.name}_epochs{epoch+1}_{utils.date}.pth")
+    def SyncModel_MinMse(self,epoch,mse):
+        path = "wifi_track_data/dacang/train_data/"
+        file_names = os.listdir(path)
+        for n in file_names:
+            if 'mse' in n:
+                if os.path.exists(path+'/'+n):
+                    os.remove(path + '/' + n)
+        torch.save(self.model.state_dict(),f"wifi_track_data/dacang/train_data/model_{self.model.name}_epoch{epoch+1}_mse{mse}_{utils.date}.pth")
+
+    def SyncModel_MinMax(self,epoch,max):
+        path = "wifi_track_data/dacang/train_data/"
+        file_names = os.listdir(path)
+        for n in file_names:
+            if 'max' in n:
+                if os.path.exists(path+'/'+n):
+                    os.remove(path + '/' + n)
+        torch.save(self.model.state_dict(),f"wifi_track_data/dacang/train_data/model_{self.model.name}_epoch{epoch+1}_max{max}_{utils.date}.pth")
 
     def SaveModel(self,path):
         torch.save(self.model.state_dict(),path)
