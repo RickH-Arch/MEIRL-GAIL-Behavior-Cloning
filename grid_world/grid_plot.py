@@ -56,7 +56,7 @@ def ShowGridWorld_anime(grids,width = 600,height = 450,title = "Grid World"):
 
     
 
-def ShowGridWorlds(grids_dict):
+def ShowGridWorlds(grids_dict,title = ''):
     fig = make_subplots(rows=float.__ceil__(len(grids_dict)/4),
                         cols=4,
                         subplot_titles=list(grids_dict.keys()))
@@ -65,7 +65,7 @@ def ShowGridWorlds(grids_dict):
         col_loc = i%4+1
         fig.add_trace(go.Heatmap(z=grid),row=row_loc,col=col_loc)
     fig.update_layout(
-        title='Grid World',
+        title=title,
         autosize=False,
         width=300 * (len(grids_dict) if len(grids_dict)<3 else 3),
         height=160*float.__ceil__(len(grids_dict)/3),
