@@ -35,7 +35,8 @@ class GridWorld_trajGen(GridWorld):
                  rewards_mul = [],
                  n_objects = -1,n_colors = -1,
                  trans_prob = 0.9,
-                 discount = 0.9):
+                 discount = 0.9,
+                 model = None):
         
         
         self.n_objects = n_objects
@@ -73,6 +74,12 @@ class GridWorld_trajGen(GridWorld):
                          discount=discount,
                          manual_deact_states=self.states_deactived)
         
+        if model:
+            self.model = model
+            self.model.eval()
+            self.model.to(device)
+            self.learn_rewards_matrix = self.GetRewardByModel()
+        
         #----rewards init and deactivate states manually----
         if features_folderPath:
             if len(self.rewards_mul) != len(self.states_features[0]):
@@ -81,6 +88,9 @@ class GridWorld_trajGen(GridWorld):
         else:
             self.real_rewards_matrix = states_matrix
         self.rewards_active = self.real_rewards_matrix.copy().reshape(self.width*self.height)[self.states_active]
+        if model:
+            self.learned_rewards_active = self.learn_rewards_matrix.copy().reshape(self.width*self.height)[self.states_active]
+        
         
     
     def reset(self,random = True):
@@ -107,15 +117,15 @@ class GridWorld_trajGen(GridWorld):
     
     
         
-    def OptimalPolicy(self):
+    def OptimalPolicy(self,rewards_arr):
         #real_rewards = torch.from_numpy(self.real_rewards_matrix.reshape(self.width*self.height)).float().to(device)
-        real_rewards = torch.from_numpy(self.rewards_active).float().to(device)
+        real_rewards = torch.from_numpy(rewards_arr).float().to(device)
         policy = value_iteration(0.001,self,real_rewards,self.discount)
         return policy.argmax(1)
     
     def GenerateTrajectories(self,traj_count,traj_length,policy=None,save = False):
         if not policy:
-            policy = self.OptimalPolicy()
+            policy = self.OptimalPolicy(self.rewards_active)
         policy = policy.cpu().numpy()
         trajs = []
         for i in tqdm(range(traj_count)):
@@ -132,7 +142,29 @@ class GridWorld_trajGen(GridWorld):
         df_trajs = pd.DataFrame({'m':m,'trajs':trajs})
         if save:
             df_trajs.to_csv(f'demo_expert_trajs_{utils.date}.csv',index=False)
-        self.df_trajs = df_trajs
+        self.df_trajs_experts = df_trajs
+        return df_trajs
+    
+    def GenerateTrajectoriesWithLearnedReward(self,traj_count,traj_length,policy=None,save = False):
+        if not policy:
+            policy = self.OptimalPolicy(self.learned_rewards_active)
+        policy = policy.cpu().numpy()
+        trajs = []
+        for i in tqdm(range(traj_count)):
+            traj = []
+            state = self.reset(random=False)
+            for j in range(traj_length):
+                index = self.state_fid[state]
+                action = policy[index]
+                next_state = self.step(action)
+                traj.append((state,action,next_state))
+                state = next_state
+            trajs.append(traj)
+        m = np.array(range(1,(len(trajs)+1)))
+        df_trajs = pd.DataFrame({'m':m,'trajs':trajs})
+        if save:
+            df_trajs.to_csv(f'demo_expert_trajs_{utils.date}.csv',index=False)
+        self.df_trajs_learners = df_trajs
         return df_trajs
     
     def feature_vector(self, state, discrete=True):
@@ -203,13 +235,25 @@ class GridWorld_trajGen(GridWorld):
         return states_deactived
     
     def GetRealRewards(self):
-        rewards = np.zeros((self.width,self.height))
+        rewards = np.zeros((self.height,self.width))
         for j in range(self.height):
             for i in range(self.width):
                 s = super().CoordToState((i,j))
                 if s in self.states_active:
                     for k in range(len(self.states_features[s])):
                         rewards[j,i] += self.states_features[s][k]*self.rewards_mul[k]
+                else:
+                    rewards[j,i] = np.nan
+        return rewards
+    
+    def GetRewardByModel(self):
+        rewards = np.zeros((self.height,self.width))
+        for j in range(self.height):
+            for i in range(self.width):
+                s = super().CoordToState((i,j))
+                if s in self.states_active:
+                    features = torch.tensor(self.states_features[s]).float().to(device)
+                    rewards[j,i] = self.model.forward(features).item()
                 else:
                     rewards[j,i] = np.nan
         return rewards
@@ -223,3 +267,47 @@ class GridWorld_trajGen(GridWorld):
         #     coord = self.StateToCoord(s)
         #     rewards[coord[1],coord[0]] = np.nan
         grid_plot.ShowGridWorld(rewards,400,400,title=title)
+
+    def ShowLearnedRewards(self,title = 'Learned Rewards'):
+        grid_plot.ShowGridWorld(self.learn_rewards_matrix,400,400,title = title)
+
+    def ShowTrajs_Learner(self):
+        ts = [] # t0:x1,t1:y1,t3:x2,t4:y2,t5:counts
+        trajs = self.df_trajs_learners['trajs'].tolist()
+        for traj in trajs:
+            for i in range(len(traj)-1):
+                t1 = traj[i]
+                t2 = traj[i+1]
+                x1,y1 = super().StateToCoord(t1[0])
+                x2,y2 = super().StateToCoord(t2[0])
+                x1 += 0.5
+                y1 += 0.5
+                x2 += 0.5
+                y2 += 0.5
+                for tt in ts:
+                    if tt[0]==x1 and tt[1]==y1 and tt[2]==x2 and tt[3]==y2:
+                        tt[4] += 1
+                        break
+                ts.append([x1,y1,x2,y2,1])
+        grid_plot.ShowTraj(ts,self.width,self.height,title='复原轨迹')
+
+    def ShowTrajs_Experts(self):
+        ts = [] # t0:x1,t1:y1,t3:x2,t4:y2,t5:counts
+        trajs = self.df_trajs_experts['trajs'].tolist()
+        for traj in trajs:
+            for i in range(len(traj)-1):
+                t1 = traj[i]
+                t2 = traj[i+1]
+                x1,y1 = super().StateToCoord(t1[0])
+                x2,y2 = super().StateToCoord(t2[0])
+                x1 += 0.5
+                y1 += 0.5
+                x2 += 0.5
+                y2 += 0.5
+                for tt in ts:
+                    if tt[0]==x1 and tt[1]==y1 and tt[2]==x2 and tt[3]==y2:
+                        tt[4] += 1
+                        break
+                ts.append([x1,y1,x2,y2,1])
+        grid_plot.ShowTraj(ts,self.width,self.height,title='专家轨迹')
+                    
