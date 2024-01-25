@@ -131,6 +131,33 @@ def ShowDynamics(dynamic_track,dir,width,height,grid):
     )
 
     fig.show()
+
+def ShowTraj(track,width,height,title='traks'):
+    fig = go.Figure()
+    for t in track:
+        x = []
+        y = []
+        
+        x.append(t[0])
+        y.append(t[1])
+        x.append(t[2])
+        y.append(t[3])
+        fig.add_trace(go.Scatter(x=x,y=y,mode='lines',
+                                 line=dict(color='red', width=t[4]/10)))
+        
+    fig.update_layout(
+        title=title,
+        autosize=False,
+        width=450,
+        height=450,
+        xaxis = dict(range=[0,width],
+                     showgrid = False),
+        yaxis = dict(range=[0,height],
+                     showgrid = False),
+        showlegend=False,
+        margin=dict(l=50, r=50, b=50, t=50),
+    )
+    fig.show()
     
         
 
