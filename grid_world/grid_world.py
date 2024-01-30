@@ -233,6 +233,18 @@ class GridWorld:
                 coord = self.StateToCoord(state)
                 features[i][coord[1],coord[0]] = f
         return features
+    
+    def ShowReward(self,reward_arr):
+        reward_grid = np.zeros((self.height,self.width))
+        for i in range(len(reward_arr)):
+            state = self.fid_state[i]
+            coord = self.StateToCoord(state)
+            reward_grid[coord[1],coord[0]] = reward_arr[i]
+        for i in range(self.height):
+            for j in range(self.width):
+                if self.count_grid[i,j] == 0:
+                    reward_grid[i,j] = np.nan
+        grid_plot.ShowGridWorld(reward_grid,500,400,title="Restored Rewards")
 
 
     def ReadEnvironments(self,folder_path):
@@ -329,7 +341,7 @@ class GridWorld:
         grid_plot.ShowGridWorld(self.count_grid)
 
     def ShowGridWorld_Count_log(self,title = "count_log"):
-        grid_plot.ShowGridWorld(np.log(self.count_grid+1),400,400,title=title)
+        grid_plot.ShowGridWorld(np.log(self.count_grid+1),500,400,title=title)
 
     def ShowGridWorld_Freq(self):
         grid_plot.ShowGridWorld(self.p_grid)
