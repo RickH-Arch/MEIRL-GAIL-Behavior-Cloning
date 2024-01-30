@@ -19,8 +19,8 @@ class GridWorld:
                 expert_traj_filePath = None,
                 expert_trajs = None,
                  width = 100,height = 75,
-                 trans_prob = 0.9,
-                 discount = 0.9,
+                 trans_prob = 0.6,
+                 discount = 0.98,
                  active_all = False,
                  manual_deact_states = [],
                  real_reward_mat = []) -> None:
@@ -62,20 +62,21 @@ class GridWorld:
 
         #-------环境，特征----------
         #环境，状态-环境，环境名称列表
+        self.states_features = {}
         if environments_folderPath:
-            self.envs,self.states_envs,self.envs_list = self.ReadEnvironments(environments_folderPath)
+            self.envs,self.states_envs,self.envs_list = self.ReadEnvironmentsFromFolder(environments_folderPath)
         #特征，状态-特征，特征名称列表
         if features_folderPath:
-            self.features,self.states_features,self.features_list = self.ReadFeatures(features_folderPath)
+            self.features,self.states_features,self.features_list = self.ReadFeaturesFromFolder(features_folderPath)
         else:
             if states_features:
                 self.states_features = states_features
                 self.features = self.SplitFeatures(self.states_features)
-            else:
-                raise Exception("feature_folderPath and states_features can't be None at the same time")
+            
             
         #特征列表，转换字典
-        self.features_arr,self.fid_state,self.state_fid = self.GetAvtiveFeatureArr(self.states_features)
+        if len(self.states_features)>0:
+            self.features_arr,self.fid_state,self.state_fid = self.GetAvtiveFeatureArr(self.states_features)
         #transition probability
         self.dynamics = self.GetTransitionMat()
         #仅记录active的dynamics，系数需要经过state_fid转换
@@ -247,7 +248,7 @@ class GridWorld:
         grid_plot.ShowGridWorld(reward_grid,500,400,title="Restored Rewards")
 
 
-    def ReadEnvironments(self,folder_path):
+    def ReadEnvironmentsFromFolder(self,folder_path):
         environments = {}
         file_names = os.listdir(folder_path)
         for file_name in file_names:
@@ -259,7 +260,7 @@ class GridWorld:
         environment_list = list(environments.keys())
         return environments,states_envs,environment_list
 
-    def ReadFeatures(self,folder_path):
+    def ReadFeaturesFromFolder(self,folder_path):
         features = {}
         file_names = os.listdir(folder_path)
         for file_name in file_names:

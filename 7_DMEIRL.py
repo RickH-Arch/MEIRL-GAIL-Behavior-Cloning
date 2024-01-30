@@ -11,7 +11,7 @@ expert_traj_path = r"wifi_track_data\dacang\track_data\trajs_0117_40x30.csv"
 world = GridWorld(features_folderPath=feature_folder_path,
                   expert_traj_filePath=expert_traj_path,
                   width=40, height=30)
-df_cluster = pd.read_csv('wifi_track_data/dacang/cluster_data/cluster_result_0105.csv')
+#df_cluster = pd.read_csv('wifi_track_data/dacang/cluster_data/cluster_result_0105.csv')
 #world.experts.ReadCluster(df_cluster)
 #world.experts.ApplyCluster((0,1,2))
 print("GridWorld initialized")

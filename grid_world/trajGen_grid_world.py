@@ -45,7 +45,7 @@ class GridWorld_trajGen(GridWorld):
         self.init_states = init_states
         self.state_now = -1
         self.states_features = None
-        self.rewards_mul = rewards_mul
+        self.rewards_weight = rewards_mul
         self.height = height
         self.width = width
         
@@ -82,7 +82,7 @@ class GridWorld_trajGen(GridWorld):
         
         #----rewards init and deactivate states manually----
         if features_folderPath:
-            if len(self.rewards_mul) != len(self.states_features[0]):
+            if len(self.rewards_weight) != len(self.states_features[0]):
                 raise ValueError("rewards_mul length not equal to states_features")
             self.real_rewards_matrix = self.GetRealRewards()
         else:
@@ -241,7 +241,7 @@ class GridWorld_trajGen(GridWorld):
                 s = super().CoordToState((i,j))
                 if s in self.states_active:
                     for k in range(len(self.states_features[s])):
-                        rewards[j,i] += self.states_features[s][k]*self.rewards_mul[k]
+                        rewards[j,i] += self.states_features[s][k]*self.rewards_weight[k]
                 else:
                     rewards[j,i] = np.nan
         return rewards
