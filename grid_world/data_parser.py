@@ -74,9 +74,9 @@ class DataParser:
     
     def ParseEnvironments(self,image_list,feature_name_list):
         for i in range(len(image_list)):
-            self.ParseEnvironment(image_list[i],feature_name_list[i])
+            self.ParseEnvironmentFromImage(image_list[i],feature_name_list[i])
     
-    def ParseEnvironment(self,image,feature_name,save_path = 'wifi_track_data/dacang/grid_data'):
+    def ParseEnvironmentFromImage(self,image,feature_name,save_path = 'wifi_track_data/dacang/grid_data'):
         '''
         args[0]:the labled rgb Image
         args[1]:name of the parsing environment 
@@ -84,32 +84,42 @@ class DataParser:
         image_array = np.array(image)
         image_array = np.invert(image_array)#反相
         image_array = np.flipud(image_array)#上下翻转
-
         #对image第三维进行求和
         env_array = np.zeros((image_array.shape[0],image_array.shape[1]))
         for i in range(0,image_array.shape[0]):
             for j in range(0,image_array.shape[1]):
                 env_array[i,j] = np.sum(image_array[i,j,:])
+        #归一化
+        env_array = utils.Normalize_2DArr(env_array)
+        self.ParseEnvironmentFrom2DArray(env_array,feature_name,save_path)
+        
 
-        folder_path = os.path.join(save_path,'envs_grid',f"{self.date}_{self.width}x{self.height}")
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
-        np.save(folder_path+f"/{feature_name}_env.npy",env_array)
+    def ParseEnvironmentFrom2DArray(self,env_array,feature_name,save_path = 'wifi_track_data/dacang/grid_data'):
+        '''
+        env_array: 2D array, min value is 0, max value is 1
+        '''
+        if save_path != '':
+            folder_path = os.path.join(save_path,'envs_grid',f"{self.date}_{self.width}x{self.height}")
+            if not os.path.exists(folder_path):
+                os.makedirs(folder_path)
+            np.save(folder_path+f"/{feature_name}_env.npy",env_array)
         self.environments.update({feature_name:env_array})
         
         #取得feature
-        feature_array = np.zeros((image_array.shape[0],image_array.shape[1]))
+        feature_array = np.zeros((env_array.shape[0],env_array.shape[1]))
         for i in range(0,feature_array.shape[0]):
             for j in range(0,feature_array.shape[1]):
                 feature_array[i,j] = grid_utils.GetFeature(env_array,i,j)
 
         feature_array = utils.Normalize_2DArr(feature_array)
 
-        folder_path = os.path.join(save_path,'features_grid',f"{self.date}_{self.width}x{self.height}")
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
-        np.save(folder_path+f"/{feature_name}_feature.npy",feature_array)
+        if save_path != '':
+            folder_path = os.path.join(save_path,'features_grid',f"{self.date}_{self.width}x{self.height}")
+            if not os.path.exists(folder_path):
+                os.makedirs(folder_path)
+            np.save(folder_path+f"/{feature_name}_feature.npy",feature_array)
         self.features.update({feature_name:feature_array})
+        
 
     def ShowEnvironments(self):
         grid_plot.ShowGridWorlds(self.environments)
