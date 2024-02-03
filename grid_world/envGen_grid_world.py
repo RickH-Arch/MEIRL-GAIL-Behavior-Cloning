@@ -9,22 +9,32 @@ import torch
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 from PIL import Image
 import os
+from tqdm import tqdm
 
 class GridWorld_envGen(GridWorld):
+    '''
+    World used to work with custom "gym env", aiming to generate new region environments according to target svf.
+    
+    its main function contains:
+    1.calculate original svf from real pedestrian trajs,
+    2.parse original region environments,
+    3.calculate current svf from changed region environments,
+    4.calculate difference between current svf and target svf
+    '''
     def __init__(self,width,height,
                  envs_folder_path,
                  experts_traj_filePath,
-                 target_svf_delta:dict,
-                 model,
+                 target_svf_delta:dict,#key:state_active, value:delta
+                 model,# nn model that convert features of particuler state to reward
                  trans_prob = 0.6,
                  discount = 0.98,
                  ):
         self.width = width
         self.height = height
-        self.parser = DataParser(width=self.width,height=self.height)
-        self.__parseOriginEnvs(envs_folder_path)
-
-
+        #self.parser = DataParser(width=self.width,height=self.height)
+        #self.__parseOriginalEnvs(envs_folder_path)
+        self.envs_arr_origin = self.parser.environments_arr #dim0: env type, dim1: env value
+        
         super().__init__(width=width,height=height,
                          expert_traj_filePath=experts_traj_filePath,
                          trans_prob=trans_prob,
@@ -35,15 +45,8 @@ class GridWorld_envGen(GridWorld):
 
         self.prob_initial_state = self.__getInitialStatesProb()
 
-    def __parseOriginEnvs(self,folder_path):
-        file_names = os.listdir(folder_path)
-        imgs = []
-        for file_name in file_names:
-            imgs.append(Image.open(folder_path + "/" + file_name))
-        for i in range(len(imgs)):
-            self.parser.ParseEnvironmentFromImage(imgs[i],file_names[i].split('.')[0],save_path='')
-
-
+    
+            
         
             
     def CalActionReward(self,envs):

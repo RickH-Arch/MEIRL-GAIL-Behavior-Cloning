@@ -3,6 +3,7 @@ import numpy as np
 from tqdm import tqdm
 from utils import utils
 from grid_world import grid_utils,grid_plot
+from PIL import Image
 import math
 from datetime import datetime
 import pickle
@@ -24,16 +25,14 @@ class DataParser:
         self.df_path = df_path
         current_time = datetime.now()
         self.date = utils.date
-        self.features = {}
-        self.environments = {}
+        self.features_dict = {}
+        self.environments_dict = {}
 
-        # self.states = self.GetAllStates()
-        # self.n_states = len(self.states)
+        self.environments_arr = [] #dim0: env type, dim1: env value
+        self.features_arr = [] #dim0:feature type, dim1:feature value
 
-        # self.n_actions = 5
-
-        self.state_envs = {}
-        self.state_features = {}
+        #self.state_envs = {}
+        #self.state_features = {}
 
     def RecordPathCount(self,df,scale = 1):
         mac_list = df.m.unique()
@@ -72,6 +71,14 @@ class DataParser:
         df.to_csv(f'wifi_track_data/dacang/track_data/trajs_{self.date}_{self.width}x{self.height}.csv',index=False)
         return df
     
+    def ParseEnvironmentFromFolder(self,folder_path):
+        file_names = os.listdir(folder_path)
+        imgs = []
+        for file_name in file_names:
+            imgs.append(Image.open(folder_path + "/" + file_name))
+        for i in tqdm(range(len(imgs)),desc="parsing environments from folder:"):
+            self.ParseEnvironmentFromImage(imgs[i],feature_name=file_names[i],save_path='')
+    
     def ParseEnvironments(self,image_list,feature_name_list):
         for i in range(len(image_list)):
             self.ParseEnvironmentFromImage(image_list[i],feature_name_list[i])
@@ -90,21 +97,24 @@ class DataParser:
             for j in range(0,image_array.shape[1]):
                 env_array[i,j] = np.sum(image_array[i,j,:])
         #归一化
-        env_array = utils.Normalize_2DArr(env_array)
+        #env_array = utils.Normalize_2DArr(env_array)
+        #超过阈值的置为1
+        env_array = np.where(env_array>8,1,0)
+        #将边缘的值置为0
+        for i in range(0,env_array.shape[0]):
+            env_array[i,0] = 0
+            env_array[i,env_array.shape[1]-1] = 0
+        for i in range(0,env_array.shape[1]):
+            env_array[0,i] = 0
+            env_array[env_array.shape[0]-1,i] = 0
+        
         self.ParseEnvironmentFrom2DArray(env_array,feature_name,save_path)
         
 
-    def ParseEnvironmentFrom2DArray(self,env_array,feature_name,save_path = 'wifi_track_data/dacang/grid_data'):
+    def ParseEnvironmentFrom2DArray(self,env_array,feature_name='',save_path = 'wifi_track_data/dacang/grid_data'):
         '''
         env_array: 2D array, min value is 0, max value is 1
         '''
-        if save_path != '':
-            folder_path = os.path.join(save_path,'envs_grid',f"{self.date}_{self.width}x{self.height}")
-            if not os.path.exists(folder_path):
-                os.makedirs(folder_path)
-            np.save(folder_path+f"/{feature_name}_env.npy",env_array)
-        self.environments.update({feature_name:env_array})
-        
         #取得feature
         feature_array = np.zeros((env_array.shape[0],env_array.shape[1]))
         for i in range(0,feature_array.shape[0]):
@@ -113,19 +123,29 @@ class DataParser:
 
         feature_array = utils.Normalize_2DArr(feature_array)
 
-        if save_path != '':
+        if save_path != '' and feature_name != '':
+            folder_path = os.path.join(save_path,'envs_grid',f"{self.date}_{self.width}x{self.height}")
+            if not os.path.exists(folder_path):
+                os.makedirs(folder_path)
+            np.save(folder_path+f"/{feature_name}_env.npy",env_array)
             folder_path = os.path.join(save_path,'features_grid',f"{self.date}_{self.width}x{self.height}")
             if not os.path.exists(folder_path):
                 os.makedirs(folder_path)
             np.save(folder_path+f"/{feature_name}_feature.npy",feature_array)
-        self.features.update({feature_name:feature_array})
+
+        if feature_name != '':
+            self.environments_dict.update({feature_name:env_array})
+            self.features_dict.update({feature_name:feature_array})
+
+        self.environments_arr.append(env_array)
+        self.features_arr.append(feature_array)
         
 
     def ShowEnvironments(self):
-        grid_plot.ShowGridWorlds(self.environments)
+        grid_plot.ShowGridWorlds(self.environments_dict)
     
     def ShowFeatures(self):
-        grid_plot.ShowGridWorlds(self.features)
+        grid_plot.ShowGridWorlds(self.features_dict)
 
     def ShowGridWorld_Count(self):
         grid_plot.ShowGridWorld(self.count_grid)
