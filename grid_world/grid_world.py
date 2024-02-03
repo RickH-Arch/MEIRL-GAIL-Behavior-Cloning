@@ -3,6 +3,8 @@ import numpy as np
 from tqdm import tqdm
 from utils import utils
 from grid_world import grid_utils,grid_plot
+from grid_world.data_parser import DataParser
+
 from grid_world.experts import Experts
 from datetime import datetime
 import os
@@ -13,9 +15,11 @@ class GridWorld:
     actions: 0:stay, 1:up, 2:down, 3:left, 4:right
     '''
     def __init__(self,
-                 environments_folderPath = None,
-                 features_folderPath = None,
-                 states_features = None,
+                 environments_img_folderPath = None,
+                 #environments_arr = None,#dim0: env type, dim1: env value
+                 #features_folderPath = None,
+                 #states_features = None,
+                 #features_arr = None,#dim0:feature type, dim1:feature value
                 expert_traj_filePath = None,
                 expert_trajs = None,
                  width = 100,height = 75,
@@ -31,6 +35,8 @@ class GridWorld:
         self.discount = discount
         self.active_all = active_all
         self.manual_deact_states = manual_deact_states
+
+        
         
         #-------专家轨迹----------
         self.experts = None
@@ -61,17 +67,33 @@ class GridWorld:
         self.neighbors = [0,width,-width,-1,1]
 
         #-------环境，特征----------
-        #环境，状态-环境，环境名称列表
-        self.states_features = {}
-        if environments_folderPath:
-            self.envs,self.states_envs,self.envs_list = self.ReadEnvironmentsFromFolder(environments_folderPath)
-        #特征，状态-特征，特征名称列表
-        if features_folderPath:
-            self.features,self.states_features,self.features_list = self.ReadFeaturesFromFolder(features_folderPath)
-        else:
-            if states_features:
-                self.states_features = states_features
-                self.features = self.SplitFeatures(self.states_features)
+        self.parser = DataParser(width=self.width,height=self.height)
+        #envs: 3d array, dim0: env type, [dim1,dim2]: env value
+        #states_envs: dict, key: state, value: env values
+        #envs_list: list of env names
+        if environments_img_folderPath:
+            self.parser.ParseEnvironmentFromFolder(environments_img_folderPath)
+            #self.envs,self.states_envs,self.envs_list = self.ReadEnvironmentsFromFolder(environments_folderPath)
+            self.envs_dict = self.parser.environments_dict
+            self.envs_list = list(self.parser.environments_dict.keys())
+            self.states_envs = self.GetStatesValueFromArr(self.envs_dict)
+            self.features_dict = self.parser.features_dict
+            self.features_list = list(self.parser.features_dict.keys())
+            self.states_features = self.GetStatesValueFromArr(self.features_dict)
+        # elif environments_arr:
+        #     self.envs = environments_arr
+        #     self.states_envs = self.GetStatesValueFromArr(self.envs)
+        #     self.envs_list = None
+        # #特征，状态-特征，特征名称列表
+        # if features_folderPath:
+        #     self.features,self.states_features,self.features_list = self.ReadFeaturesFromFolder(features_folderPath)
+        # elif states_features:
+        #     self.states_features = states_features
+        #     self.features = self.SplitFeatures(self.states_features)
+        # elif features_arr:
+        #     self.features = features_arr
+        #     self.states_features = self.GetStatesValueFromArr(self.features)
+        #     self.features_list = None
             
             
         #特征列表，转换字典
@@ -254,11 +276,10 @@ class GridWorld:
         for file_name in file_names:
             env_array = np.load(os.path.join(folder_path,file_name))
             environments.update({file_name.split("_")[0]:env_array})
-        states_envs = {}
-        for state in self.states_all:
-            states_envs.update({state:self._loadStateEnvs(state,environments)})
-        environment_list = list(environments.keys())
-        return environments,states_envs,environment_list
+
+        states_envs = self.GetStatesValueFromArr(list(environments.values()))
+        
+        return environments,states_envs,environments.keys()
 
     def ReadFeaturesFromFolder(self,folder_path):
         features = {}
@@ -266,13 +287,17 @@ class GridWorld:
         for file_name in file_names:
             feature_array = np.load(os.path.join(folder_path,file_name))
             features.update({file_name.split("_")[0]:feature_array})
-        states_features = {}
-        for state in self.states_all:
-            states_features.update({state:self._loadStateFeatures(state,features)})
-        feature_list = list(features.keys())
-        return features,states_features,feature_list
+        
+        states_features= self.GetStatesValueFromArr(list(features.values()))
 
+        return features,states_features,features.keys()
     
+    def GetStatesValueFromArr(self,values):
+        states_value = {}
+        for state in self.states_all:
+            states_value.update({state:self._loadStateValue(state,values)})
+        
+        return states_value
 
 
     def _readEnvironment(self,env_name,file_path):
@@ -282,27 +307,21 @@ class GridWorld:
     
     def _readFeature(self,feature_name,file_path):
         feature_array = np.load(file_path)
-        self.features.update({feature_name:feature_array})
+        self.features_dict.update({feature_name:feature_array})
         return feature_array
     
-    def _loadStateEnvs(self,state,environments):
+    def _loadStateValue(self,state,values):
         x,y = self.StateToCoord(state)
-        envs = []
-        for env in environments.values():
-            envs.append(env[y,x])
-        return envs
-    
-    def _loadStateFeatures(self,state,features):
-        x,y = self.StateToCoord(state)
-        fs = []
-        for feature in features.values():
-            fs.append(feature[y,x])
-        return fs
+        vs = []
+        for value in values.values():
+            vs.append(value[y,x])
+        return vs
     
     def ReadExpertTrajs(self,file_path):
         df_expert_trajs = pd.read_csv(file_path)
         df_expert_trajs['trajs'] = df_expert_trajs['trajs'].apply(lambda x:eval(x))
         return df_expert_trajs
+    
     
 #------------------------------------utils method------------------------------------------
     def CoordToState(self,coord):
@@ -333,10 +352,10 @@ class GridWorld:
 #------------------------------------Plot------------------------------------------
     
     def ShowEnvironments(self):
-        grid_plot.ShowGridWorlds(self.envs)
+        grid_plot.ShowGridWorlds(self.envs_dict)
     
     def ShowFeatures(self):
-        grid_plot.ShowGridWorlds(self.features)
+        grid_plot.ShowGridWorlds(self.features_dict)
 
     def ShowGridWorld_Count(self):
         grid_plot.ShowGridWorld(self.count_grid)
