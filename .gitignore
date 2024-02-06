@@ -1,6 +1,7 @@
 /test
 /temp
 /results
-/_pycache_
+*/_pycache_
 /utils/__pycache__
-test
+*/test
+/ray_result
