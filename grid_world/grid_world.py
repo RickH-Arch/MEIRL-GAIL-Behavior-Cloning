@@ -16,10 +16,10 @@ class GridWorld:
     '''
     def __init__(self,
                  environments_img_folderPath = None,
-                 #environments_arr = None,#dim0: env type, dim1: env value
-                 #features_folderPath = None,
-                 #states_features = None,
-                 #features_arr = None,#dim0:feature type, dim1:feature value
+                 environments_arr = None,#dim0: env type, dim1: env value
+                 features_folderPath = None,
+                 states_features = None,
+                 features_arr = None,#dim0:feature type, dim1:feature value
                 expert_traj_filePath = None,
                 expert_trajs = None,
                  width = 100,height = 75,
@@ -76,24 +76,25 @@ class GridWorld:
             #self.envs,self.states_envs,self.envs_list = self.ReadEnvironmentsFromFolder(environments_folderPath)
             self.envs_dict = self.parser.environments_dict
             self.envs_list = list(self.parser.environments_dict.keys())
-            self.states_envs = self.GetStatesValueFromArr(self.envs_dict)
+            self.states_envs = self.GetStatesValueFromDict(self.envs_dict)
             self.features_dict = self.parser.features_dict
             self.features_list = list(self.parser.features_dict.keys())
-            self.states_features = self.GetStatesValueFromArr(self.features_dict)
-        # elif environments_arr:
-        #     self.envs = environments_arr
-        #     self.states_envs = self.GetStatesValueFromArr(self.envs)
-        #     self.envs_list = None
-        # #特征，状态-特征，特征名称列表
-        # if features_folderPath:
-        #     self.features,self.states_features,self.features_list = self.ReadFeaturesFromFolder(features_folderPath)
-        # elif states_features:
-        #     self.states_features = states_features
-        #     self.features = self.SplitFeatures(self.states_features)
-        # elif features_arr:
-        #     self.features = features_arr
-        #     self.states_features = self.GetStatesValueFromArr(self.features)
-        #     self.features_list = None
+            self.states_features = self.GetStatesValueFromDict(self.features_dict)
+        else:
+            if environments_arr:
+                self.envs = environments_arr
+                self.states_envs = self.GetStatesValueFromArr(self.envs)
+                self.envs_list = None
+            #特征，状态-特征，特征名称列表
+            if features_folderPath:
+                self.features_dict,self.states_features,self.features_list = self.ReadFeaturesFromFolder(features_folderPath)
+            elif states_features:
+                self.states_features = states_features
+                self.features_dict = self.SplitFeatures(self.states_features)
+            # elif features_arr:
+            #     self.features = features_arr
+            #     self.states_features = self.GetStatesValueFromArr(self.features)
+            #     self.features_list = None
             
             
         #特征列表，转换字典
@@ -235,6 +236,7 @@ class GridWorld:
                 state_fid[state] = len(state_fid)
         return np.array(feature_arr),fid_state,state_fid
     
+    #convert 2d array real reward to 1d array
     def GetRealRewardArr(self,real_reward_mat):
         if len(real_reward_mat) == 0:
             return []
@@ -277,7 +279,7 @@ class GridWorld:
             env_array = np.load(os.path.join(folder_path,file_name))
             environments.update({file_name.split("_")[0]:env_array})
 
-        states_envs = self.GetStatesValueFromArr(list(environments.values()))
+        states_envs = self.GetStatesValueFromDict(list(environments.values()))
         
         return environments,states_envs,environments.keys()
 
@@ -288,15 +290,21 @@ class GridWorld:
             feature_array = np.load(os.path.join(folder_path,file_name))
             features.update({file_name.split("_")[0]:feature_array})
         
-        states_features= self.GetStatesValueFromArr(list(features.values()))
+        states_features= self.GetStatesValueFromDict(list(features.values()))
 
         return features,states_features,features.keys()
     
-    def GetStatesValueFromArr(self,values):
+    def GetStatesValueFromDict(self,values_dict):
         states_value = {}
         for state in self.states_all:
-            states_value.update({state:self._loadStateValue(state,values)})
+            states_value.update({state:self._loadStateValue(state,values_dict)})
         
+        return states_value
+    
+    def GetStatesValueFromArr(self,values_arr):
+        states_value = {}
+        for s in self.states_all:
+            states_value.update({s:self._loadStateValue(s,values_arr)})
         return states_value
 
 
@@ -313,8 +321,12 @@ class GridWorld:
     def _loadStateValue(self,state,values):
         x,y = self.StateToCoord(state)
         vs = []
-        for value in values.values():
-            vs.append(value[y,x])
+        if type(values) == dict:
+            for value in values.values():
+                vs.append(value[y,x])
+        else:
+            for value in values:
+                vs.append(value[y,x])
         return vs
     
     def ReadExpertTrajs(self,file_path):
