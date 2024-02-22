@@ -99,7 +99,7 @@ class DataParser:
         #归一化
         #env_array = utils.Normalize_2DArr(env_array)
         #超过阈值的置为1
-        env_array = np.where(env_array>8,1,0)
+        env_array = np.where(env_array>10,1,0)
         #将边缘的值置为0
         for i in range(0,env_array.shape[0]):
             env_array[i,0] = 0
@@ -116,12 +116,7 @@ class DataParser:
         env_array: 2D array, min value is 0, max value is 1
         '''
         #取得feature
-        feature_array = np.zeros((env_array.shape[0],env_array.shape[1]))
-        for i in range(0,feature_array.shape[0]):
-            for j in range(0,feature_array.shape[1]):
-                feature_array[i,j] = grid_utils.GetFeature(env_array,i,j)
-
-        feature_array = utils.Normalize_2DArr(feature_array)
+        feature_array = self.__getFeatureFromEnv2DArray(env_array)
 
         if save_path != '' and feature_name != '':
             folder_path = os.path.join(save_path,'envs_grid',f"{self.date}_{self.width}x{self.height}")
@@ -139,6 +134,26 @@ class DataParser:
 
         self.environments_arr.append(env_array)
         self.features_arr.append(feature_array)
+
+    def __getFeatureFromEnv2DArray(self,env_array):
+        feature_array = np.zeros((env_array.shape[0],env_array.shape[1]))
+        for i in range(0,feature_array.shape[0]):
+            for j in range(0,feature_array.shape[1]):
+                feature_array[i,j] = grid_utils.GetFeature(env_array,i,j)
+        feature_array = utils.Normalize_2DArr(feature_array)
+        return feature_array
+    
+    def GetFeaturesFromEnvs2DArray(self,env_array):
+        features_arr = []
+        for i in range(len(env_array)):
+            features_arr.append(self.__getFeatureFromEnv2DArray(env_array[i]))
+        return features_arr
+    
+    def Reset(self):
+        self.environments_dict = {}
+        self.features_dict = {}
+        self.environments_arr = []
+        self.features_arr = []
         
 
     def ShowEnvironments(self):
