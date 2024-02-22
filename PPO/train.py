@@ -2,9 +2,14 @@ import gymnasium as gym
 from ray.rllib.algorithms.ppo import PPOConfig
 import ray
 from ray.rllib.utils.framework import try_import_torch
+import os
+print(os.getcwd())
+
 
 import sys
-sys.path.append('c:\\Users\\ricks\\OneDrive\\_EVENTS_\\BehaviorCloningProject\\PROJECT\\MEIRL-GAIL-Behavior-Cloning')
+sys.path.append(os.getcwd())
+
+#from env import RegionSensor
 
 from grid_world.envGen_grid_world import GridWorld_envGen
 from ray.rllib.env.env_context import EnvContext
@@ -12,8 +17,11 @@ import gymnasium as gym
 import numpy as np
 import torch
 
+
+
 if ray.is_initialized(): ray.shutdown()
-ray.init(include_dashboard=True,ignore_reinit_error=True)
+ray.init(include_dashboard=True,ignore_reinit_error=True,
+         num_gpus=1)
 print('----->',ray.get_gpu_ids())
 print('----->',torch.cuda.is_available())
 print('----->',torch.cuda.device_count())
@@ -93,16 +101,17 @@ class RegionSensor(gym.Env):
         env_arr: 3D array,dim0:categoty of env,dim1:y_coord,dim2:x_coord
         '''
         return self.world.CalActionReward(env_arr)
+
 config = (
     PPOConfig().environment(
         env=RegionSensor,
         env_config={"width":10,
         "height":10,
-        'envs_img_folder_path':r'C:\Users\ricks\OneDrive\_EVENTS_\BehaviorCloningProject\PROJECT\MEIRL-GAIL-Behavior-Cloning\demo_dmeirl\demo_label\train',
+        'envs_img_folder_path': os.getcwd()+'/demo_dmeirl/demo_label/train',
         'target_svf_delta':{50:0.5,40:1,30:1,20:1,10:1,0:1},
-        'model_path':r'C:\Users\ricks\OneDrive\_EVENTS_\BehaviorCloningProject\PROJECT\MEIRL-GAIL-Behavior-Cloning\demo_dmeirl\demo_result\1_model.pth',
+        'model_path':os.getcwd()+'/demo_dmeirl/demo_result/1_model.pth',
         'max_step_count':20,
-        'experts_traj_path':r'C:\Users\ricks\OneDrive\_EVENTS_\BehaviorCloningProject\PROJECT\MEIRL-GAIL-Behavior-Cloning\demo_dmeirl\demo_expert_trajs_0205.csv'},
+        'experts_traj_path':os.getcwd()+'/demo_dmeirl/demo_expert_trajs_0205.csv'},
     )
     .framework("torch")
     .rollouts(num_rollout_workers=1)
