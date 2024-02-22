@@ -80,7 +80,7 @@ class DMEIRL:
         last_mse = 10000
         last_max = 10000
         
-        for i in range(n_epochs):
+        for i in tqdm(range(n_epochs)):
             if not demo:
                 print("=============================epoch{}=============================".format(i+1))
             if i != 0:
@@ -163,6 +163,7 @@ class DMEIRL:
 
         return mu.sum(dim = 0)
     
+    #lower vision
     def Expected_StateVisitationFrequency_2(self,policy):
         # mu[s,t] is the probability of visiting state s at time t
         policy = policy.cpu().numpy()
