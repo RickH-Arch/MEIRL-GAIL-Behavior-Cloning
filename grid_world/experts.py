@@ -38,6 +38,7 @@ class Experts:
     def ReadExpertTrajs(self,trajs_file_path):
         df_trajs_all = pd.read_csv(trajs_file_path)
         df_trajs_all['trajs'] = df_trajs_all['trajs'].apply(lambda x:eval(x))
+        print(f"Get experts trajs num:{len(df_trajs_all)}")
         return df_trajs_all
         
     def GetExpertTraj(self,m):
@@ -104,3 +105,4 @@ class Experts:
         self.df_trajs = self.df_trajs_all[self.df_trajs_all['cluster'].isin(c_set)].reset_index(drop=True)
         self.trajs = self.df_trajs['trajs'].tolist()
         self.traj_avg_length = int(np.mean(self.df_trajs['trajs'].apply(lambda x:len(x))))
+        print(f"applied clusterd trajs num: {len(self.df_trajs)}")

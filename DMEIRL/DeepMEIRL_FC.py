@@ -11,11 +11,11 @@ from tensorboardX import SummaryWriter
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
-seed = 110
-torch.manual_seed(seed)  # 为CPU设置随机种子
-np.random.seed(seed)  # Numpy module.
-if torch.cuda.is_available():
-        torch.cuda.manual_seed(seed)
+# seed = 110
+# torch.manual_seed(seed)  # 为CPU设置随机种子
+# np.random.seed(seed)  # Numpy module.
+# if torch.cuda.is_available():
+#         torch.cuda.manual_seed(seed)
 
 
 class DeepMEIRL_FC(nn.Module):
@@ -92,7 +92,7 @@ class DMEIRL:
                 self.SyncRewards(i)
 
             #compute grad
-            policy = value_iteration(0.001,self.world,rewards.detach(),self.world.discount,demo=demo)
+            policy = value_iteration(0.005,self.world,rewards.detach(),self.world.discount,demo=demo)
             exp_svf = self.Expected_StateVisitationFrequency(policy)
             r_grad = svf - exp_svf
             r_grad_np = r_grad.detach().cpu().numpy()
@@ -179,28 +179,28 @@ class DMEIRL:
         return mu.sum(axis=1)
     
     def SyncRewards(self,epoch):
-        last_file = f"wifi_track_data/dacang/train_data/rewards_{self.model.name}_epoch{epoch}_{utils.date}.npy"
+        last_file = f"train/rewards_{self.model.name}_epoch{epoch}_{utils.date}.npy"
         if os.path.exists(last_file):
             os.remove(last_file)
-        np.save(f"wifi_track_data/dacang/train_data/rewards_{self.model.name}_epoch{epoch+1}_{utils.date}.npy" ,self.rewards)
+        np.save(f"train/rewards_{self.model.name}_epoch{epoch+1}_{utils.date}.npy" ,self.rewards)
     
     def SyncModel_MinMse(self,epoch,mse):
-        path = "wifi_track_data/dacang/train_data/"
+        path = "train/"
         file_names = os.listdir(path)
         for n in file_names:
             if 'mse' in n:
                 if os.path.exists(path+'/'+n):
                     os.remove(path + '/' + n)
-        torch.save(self.model.state_dict(),f"wifi_track_data/dacang/train_data/model_{self.model.name}_epoch{epoch+1}_mse{mse}_{utils.date}.pth")
+        torch.save(self.model.state_dict(),f"train/model_{self.model.name}_epoch{epoch+1}_mse{mse}_{utils.date}.pth")
 
     def SyncModel_MinMax(self,epoch,max):
-        path = "wifi_track_data/dacang/train_data/"
+        path = "train/"
         file_names = os.listdir(path)
         for n in file_names:
             if 'max' in n:
                 if os.path.exists(path+'/'+n):
                     os.remove(path + '/' + n)
-        torch.save(self.model.state_dict(),f"wifi_track_data/dacang/train_data/model_{self.model.name}_epoch{epoch+1}_max{max}_{utils.date}.pth")
+        torch.save(self.model.state_dict(),f"train/model_{self.model.name}_epoch{epoch+1}_max{max}_{utils.date}.pth")
 
     def SaveModel(self,path):
         torch.save(self.model.state_dict(),path)

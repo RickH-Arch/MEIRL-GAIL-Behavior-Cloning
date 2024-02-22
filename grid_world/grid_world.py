@@ -17,7 +17,7 @@ class GridWorld:
     def __init__(self,
                  environments_img_folderPath = None,
                  #environments_arr = None,#dim0: env type, dim1: env value
-                 #features_folderPath = None,
+                 features_folderPath = None,
                  #states_features = None,
                  #features_arr = None,#dim0:feature type, dim1:feature value
                 expert_traj_filePath = None,
@@ -85,8 +85,8 @@ class GridWorld:
         #     self.states_envs = self.GetStatesValueFromArr(self.envs)
         #     self.envs_list = None
         # #特征，状态-特征，特征名称列表
-        # if features_folderPath:
-        #     self.features,self.states_features,self.features_list = self.ReadFeaturesFromFolder(features_folderPath)
+        if features_folderPath:
+             self.features,self.states_features,self.features_list = self.ReadFeaturesFromFolder(features_folderPath)
         # elif states_features:
         #     self.states_features = states_features
         #     self.features = self.SplitFeatures(self.states_features)
@@ -313,8 +313,12 @@ class GridWorld:
     def _loadStateValue(self,state,values):
         x,y = self.StateToCoord(state)
         vs = []
-        for value in values.values():
-            vs.append(value[y,x])
+        if type(values) == dict:
+            for value in values.values():
+                vs.append(value[y,x])
+        else:
+            for value in values:
+                vs.append(value[y,x])
         return vs
     
     def ReadExpertTrajs(self,file_path):
