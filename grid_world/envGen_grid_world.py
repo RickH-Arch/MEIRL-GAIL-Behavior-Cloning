@@ -7,7 +7,8 @@ from utils import utils
 from DMEIRL.value_iteration import value_iteration
 import torch
 import torch.nn as nn
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+#device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:0")
 from PIL import Image
 import os
 from tqdm import tqdm
@@ -37,8 +38,8 @@ class GridWorld_envGen(GridWorld):
         self.height = height
         
         model = DeepMEIRL_FC(n_input=4,layers=(16,16))
-        model.to('cuda')
-        model.load_state_dict(torch.load(model_path))
+        model.to(device)
+        model.load_state_dict(torch.load(model_path,map_location='cuda:0'))
         model.eval()
         model.cuda()
         self.model = model

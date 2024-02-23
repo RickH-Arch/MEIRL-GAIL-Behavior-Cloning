@@ -6,20 +6,29 @@ from grid_world.envGen_grid_world import GridWorld_envGen
 from ray.rllib.env.env_context import EnvContext
 
 class RegionSensor(gym.Env):
-    def __init__(self,config:EnvContext):
+    def __init__(self,config:EnvContext,custom_config = None):
         '''
         config: width,height,envs_img_folder_path,
         target_svf_delta: dict, key:state_active, value:delta,
         model_path: path of model that used by env gen world to convert feature to reward,
         max_step_count: 
         '''
-        self.width = config['width']
-        self.height = config['height']
-        self.envs_img_folder_path = config['envs_img_folder_path']
-        self.target_svf_delta = config['target_svf_delta']
-        self.model_path = config['model_path']
-        self.max_step_count = config['max_step_count']
-        self.experts_traj_path = config['experts_traj_path']
+        if custom_config is None:
+            self.width = config['width']
+            self.height = config['height']
+            self.envs_img_folder_path = config['envs_img_folder_path']
+            self.target_svf_delta = config['target_svf_delta']
+            self.model_path = config['model_path']
+            self.max_step_count = config['max_step_count']
+            self.experts_traj_path = config['experts_traj_path']
+        else:
+            self.width = custom_config['width']
+            self.height = custom_config['height']
+            self.envs_img_folder_path = custom_config['envs_img_folder_path']
+            self.target_svf_delta = custom_config['target_svf_delta']
+            self.model_path = custom_config['model_path']
+            self.max_step_count = custom_config['max_step_count']
+            self.experts_traj_path = custom_config['experts_traj_path']
 
         self.world = GridWorld_envGen(self.width,self.height,
                                        self.envs_img_folder_path,
@@ -33,6 +42,7 @@ class RegionSensor(gym.Env):
         self.action_space = gym.spaces.MultiDiscrete([self.origin_env_np.shape[0],self.origin_env_np.shape[1],self.origin_env_np.shape[2],2])
         self.observation_space = gym.spaces.Box(low=0.,high=1.0,shape=(len(self.init_state),),dtype=np.int32)
         self.step_count = 0
+        self.reset(seed=self.width*self.height)
 
     def reset(self,*,seed=None,options=None):
         self.cur_state = self.init_state
@@ -42,7 +52,7 @@ class RegionSensor(gym.Env):
     
     def step(self,action):
         '''
-        action: [feature_idx,state,status]
+        action: [feature_idx,state_y,state_x,status]
         if state == 0, then the feature is set to 0
         if state == 1, then the feature is set to 1
         '''
