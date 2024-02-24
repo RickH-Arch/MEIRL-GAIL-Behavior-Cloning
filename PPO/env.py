@@ -36,42 +36,49 @@ class RegionSensor(gym.Env):
                                        self.target_svf_delta,
                                        self.model_path)
         
-        self.cur_env_np = self.origin_env_np = np.array(self.world.parser.environments_arr)
-        self.init_state = self.origin_env_np.reshape(-1)
+        self.origin_env_np = np.array(self.world.parser.environments_arr)
+        self.feature_num = self.origin_env_np.shape[0]
+        self.y_num = self.origin_env_np.shape[1]
+        self.x_num = self.origin_env_np.shape[2]
+
+        self.init_state = self.origin_env_np
+        self.total_state_num = len(self.init_state.reshape(-1))
         self.cur_state = self.init_state
-        self.action_space = gym.spaces.MultiDiscrete([self.origin_env_np.shape[0],self.origin_env_np.shape[1],self.origin_env_np.shape[2],2])
-        self.observation_space = gym.spaces.Box(low=0.,high=1.0,shape=(len(self.init_state),),dtype=np.int32)
+        #self.action_space = gym.spaces.MultiDiscrete([self.origin_env_np.shape[0],self.origin_env_np.shape[1],self.origin_env_np.shape[2],2])
+        self.action_space = gym.spaces.Discrete(self.total_state_num)
+        self.observation_space = gym.spaces.Box(low=0,high=1,shape=(self.feature_num,self.y_num,self.x_num,),dtype=np.int32)
         self.step_count = 0
         self.reset(seed=self.width*self.height)
 
     def reset(self,*,seed=None,options=None):
         self.cur_state = self.init_state
-        self.cur_env_np = self.origin_env_np
         self.step_count = 0
         return np.array(self.cur_state,dtype=np.int32),{}
     
     def step(self,action):
         '''
-        action: [feature_idx,state_y,state_x,status]
-        if state == 0, then the feature is set to 0
-        if state == 1, then the feature is set to 1
+        action: [status*feature_num*y_num*x_num + (feature_idx)*y_num*x_num + y_idx*x_num + x_idx]
+        if states == 0, env = 0,
+        if states == 1, env = 1,
         '''
         #parse action
-        feature_idx = action[0]
-        state_y = action[1]
-        state_x = action[2]
-        status = action[3]
+        status = 0 if action <= self.total_state_num-1 else 1
+        if status == 1:
+            action -= self.total_state_num
+        feature_idx = action // (self.y_num*self.x_num)
+        idx = action - feature_idx*(self.y_num * self.x_num)
+        y_idx = idx // self.x_num
+        x_idx = idx - self.x_num*y_idx
 
         #apply action
-        state_2d = self.cur_state.reshape(self.origin_env_np.shape)
+        #state_2d = self.cur_state.reshape(self.origin_env_np.shape)
         if status == 0:
-            state_2d[feature_idx,state_y,state_x] = 0
+            self.cur_state[feature_idx,y_idx,x_idx] = 0
         else:
-            state_2d[feature_idx,state_y,state_x] = 1
-        self.cur_state = state_2d.reshape(-1)
+            self.cur_state[feature_idx,y_idx,x_idx] = 1
 
         #cal reward
-        reward = self.get_reward(state_2d)
+        reward = self.get_reward(self.cur_state)
 
         #done?
         self.step_count += 1
