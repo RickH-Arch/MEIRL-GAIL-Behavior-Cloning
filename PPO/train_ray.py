@@ -11,8 +11,7 @@ sys.path.append(os.getcwd())
 
 from PPO.env import RegionSensor
 
-from grid_world.envGen_grid_world import GridWorld_envGen
-from ray.rllib.env.env_context import EnvContext
+
 import gymnasium as gym
 import numpy as np
 import torch
