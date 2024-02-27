@@ -11,11 +11,11 @@ from tensorboardX import SummaryWriter
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
-# seed = 110
-# torch.manual_seed(seed)  # 为CPU设置随机种子
-# np.random.seed(seed)  # Numpy module.
-# if torch.cuda.is_available():
-#         torch.cuda.manual_seed(seed)
+seed = 110
+torch.manual_seed(seed)  # 为CPU设置随机种子
+np.random.seed(seed)  # Numpy module.
+if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
 
 
 class DeepMEIRL_FC(nn.Module):
@@ -34,7 +34,6 @@ class DeepMEIRL_FC(nn.Module):
             self.net.append(nn.ELU())
             n_input = l
         self.net.append(nn.Linear(n_input,1))
-        #self.net.append(nn.Tanh())
         self.net.append(nn.Sigmoid())
         self.net = nn.Sequential(*self.net)
 
@@ -42,14 +41,14 @@ class DeepMEIRL_FC(nn.Module):
         for m in self.net:
             if isinstance(m, nn.Linear):
                 nn.init.xavier_uniform_(m.weight)
-                #nn.init.constant_(m.bias, 0.0)
+                nn.init.constant_(m.bias, 0.0)
     
     def forward(self,features):
         out = self.net(features)
         return out
     
 class DMEIRL:
-    def __init__(self,world,layers = (50,30),load = "",lr = 0.001,weight_decay = 1,clip_norm = -1,log = '',log_dir = 'run'):
+    def __init__(self,world,layers = (50,30),load = "",lr = 0.001,weight_decay = 0.5,clip_norm = -1,log = '',log_dir = 'run'):
         self.clip_norm = clip_norm
         
         self.world = world
@@ -73,8 +72,8 @@ class DMEIRL:
         self.rewards = []
         svf = self.StateVisitationFrequency()
         com_last = 100
-        rewards = self.model(self.features).flatten()
-        self.rewards.append(rewards.detach().cpu().numpy())
+        reward = self.model(self.features).flatten()
+        self.rewards.append(reward.detach().cpu().numpy())
         self.exploded = False
 
         last_mse = 10000
@@ -84,15 +83,15 @@ class DMEIRL:
             if not demo:
                 print("=============================epoch{}=============================".format(i+1))
             if i != 0:
-                rewards = self.model(self.features).flatten()
-                self.rewards.append(rewards.detach().cpu().numpy())
+                reward = self.model(self.features).flatten()
+                self.rewards.append(reward.detach().cpu().numpy())
 
             #save rewards
             if save and not demo:
                 self.SyncRewards(i)
 
             #compute grad
-            policy = value_iteration(0.005,self.world,rewards.detach(),self.world.discount,demo=demo)
+            policy = value_iteration(0.001,self.world,reward.detach(),self.world.discount,demo=demo)
             exp_svf = self.Expected_StateVisitationFrequency(policy)
             r_grad = svf - exp_svf
             r_grad_np = r_grad.detach().cpu().numpy()
@@ -110,10 +109,14 @@ class DMEIRL:
                 self.writer.add_scalar('SVF delta max/Train',max,i)
                 self.writer.add_scalar('SVF delta min/Train',np.min(r_grad_np),i)
                 self.writer.add_scalar('SVF delta mse/Train',mse,i)
+                reward_delta = self.rewards[-1].max()-self.rewards[-1].min()
+                self.writer.add_scalar('reward delta',reward_delta,i)
+
+            
 
             #update model
             self.optimizer.zero_grad()
-            rewards.backward(-r_grad)
+            reward.backward(-r_grad)
             if self.clip_norm != -1:
                 total_norm = nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.clip_norm, norm_type=2)
                 if not demo:
@@ -131,9 +134,9 @@ class DMEIRL:
 
 
         with torch.no_grad():
-            rewards = self.model.forward(self.features).flatten()
+            reward = self.model.forward(self.features).flatten()
 
-        return rewards.detach().cpu().numpy(),self.rewards
+        return reward.detach().cpu().numpy(),self.rewards
 
     def StateVisitationFrequency(self):
         svf = torch.zeros(self.world.n_states_active,dtype=torch.float32).to(device)
@@ -163,7 +166,7 @@ class DMEIRL:
 
         return mu.sum(dim = 0)
     
-    #lower vision
+    #slower version
     def Expected_StateVisitationFrequency_2(self,policy):
         # mu[s,t] is the probability of visiting state s at time t
         policy = policy.cpu().numpy()

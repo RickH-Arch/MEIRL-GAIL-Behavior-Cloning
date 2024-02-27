@@ -58,7 +58,7 @@ class Actor(nn.Module):
         self.avgPool_net = nn.Sequential(*avgPool_net)
 
         #fc net
-        n_input = shape_state[0]*s1*s2
+        n_input = int(shape_state[0]*s1*s2)
         print(f"Actor FC n_input:{n_input}, Actor FC n_output:{num_action}")
         fc_net = []
         for l in fc_layers:
@@ -75,7 +75,10 @@ class Actor(nn.Module):
         #x = F.relu(self.fc1(x))
         #action_prob = F.softmax(self.action_head(x), dim=1)
         x = self.avgPool_net(x)
-        x = x.reshape(-1)
+        if len(x.shape)<4:
+            x = x.reshape(-1).unsqueeze(0)
+        else:
+            x = x.reshape(x.shape[0],-1)
         action_prob = self.fc_net(x)
 
         return action_prob
@@ -102,8 +105,8 @@ class Critic(nn.Module):
         self.avgPool_net = nn.Sequential(*avgPool_net)
 
         #fc net
-        n_input = shape_state[0]*s1*s2
-        print(f"Critic FC n_input:{n_input}, Actor FC n_output: 1")
+        n_input = int(shape_state[0]*s1*s2)
+        print(f"Critic FC n_input:{n_input}, Critic FC n_output: 1")
         fc_net = []
         for l in layers:
             fc_net.append(nn.Linear(n_input,l))
@@ -116,7 +119,7 @@ class Critic(nn.Module):
 
     def forward(self, x):
         x = self.avgPool_net(x)
-        x = x.reshape(-1)
+        x = x.reshape(x.shape[0],-1)
         value = self.fc_net(x)
         #x = F.relu(self.fc1(x))
         #value = self.state_value(x)
@@ -137,15 +140,15 @@ class PPO():
         self.buffer = []
         self.counter = 0
         self.training_step = 0
-        self.writer = SummaryWriter('../PPO_train')
+        self.writer = SummaryWriter('./PPO_result')
 
         self.actor_optimizer = optim.Adam(self.actor_net.parameters(), 1e-3,weight_decay=0.5)
         self.critic_net_optimizer = optim.Adam(self.critic_net.parameters(), 3e-3,weight_decay=0.5)
-        if not os.path.exists('../PPO_param'):
-            os.makedirs('../PPO_param')
+        # if not os.path.exists('../PPO_param'):
+        #     os.makedirs('../PPO_param')
 
     def select_action(self, state):
-        state = torch.from_numpy(state).float().unsqueeze(0)
+        state = torch.from_numpy(state).float()
         with torch.no_grad():
             action_prob = self.actor_net(state)
         c = Categorical(action_prob)
@@ -201,7 +204,7 @@ class PPO():
 
                 # update actor network
                 action_loss = -torch.min(surr1, surr2).mean()  # MAX->MIN desent
-                #self.writer.add_scalar('loss/action_loss', action_loss, global_step=self.training_step)
+                self.writer.add_scalar('loss/action_loss', action_loss, global_step=self.training_step)
                 self.actor_optimizer.zero_grad()
                 action_loss.backward()
                 nn.utils.clip_grad_norm_(self.actor_net.parameters(), self.max_grad_norm)
@@ -209,7 +212,7 @@ class PPO():
 
                 #update critic network
                 value_loss = F.mse_loss(Gt_index, V)
-                #self.writer.add_scalar('loss/value_loss', value_loss, global_step=self.training_step)
+                self.writer.add_scalar('loss/value_loss', value_loss, global_step=self.training_step)
                 self.critic_net_optimizer.zero_grad()
                 value_loss.backward()
                 nn.utils.clip_grad_norm_(self.critic_net.parameters(), self.max_grad_norm)

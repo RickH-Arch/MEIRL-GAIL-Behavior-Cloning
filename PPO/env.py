@@ -2,6 +2,7 @@ import gymnasium as gym
 import numpy as np
 import sys
 sys.path.append('../')
+sys.path.append('../../')
 from grid_world.envGen_grid_world import GridWorld_envGen
 from ray.rllib.env.env_context import EnvContext
 
@@ -13,6 +14,8 @@ class RegionSensor(gym.Env):
         model_path: path of model that used by env gen world to convert feature to reward,
         max_step_count: 
         '''
+
+        #ray config
         if custom_config is None:
             self.width = config['width']
             self.height = config['height']
@@ -21,6 +24,7 @@ class RegionSensor(gym.Env):
             self.model_path = config['model_path']
             self.max_step_count = config['max_step_count']
             self.experts_traj_path = config['experts_traj_path']
+        #custom config
         else:
             self.width = custom_config['width']
             self.height = custom_config['height']
@@ -96,7 +100,7 @@ class RegionSensor(gym.Env):
         '''
         env_arr: 3D array,dim0:categoty of env,dim1:y_coord,dim2:x_coord
         '''
-        return self.world.CalActionReward(env_arr)
+        return self.world.CalActionReward(env_arr)*10
         
 
 
