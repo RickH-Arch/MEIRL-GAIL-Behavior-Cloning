@@ -30,7 +30,7 @@ print(f'num_action:{num_action}')
 
 agent = PPO(shape_state,num_action,aPool_num = 1,actor_layers = [100,100,200],critic_layers=[100,100,50])
 
-for i_epoch in range(100):
+for i_epoch in range(1000):
     print(f"===== epoch {i_epoch} start =====")
     state = env.reset()[0]
     for t in count():
