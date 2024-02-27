@@ -42,7 +42,7 @@ def ShowGridWorld_anime(grids,width = 600,height = 450,title = "Grid World"):
                 buttons=[dict(label="Play",
                               method="animate",
                               args=[None, {"frame": {"duration": 10, "redraw": True},
-                                           "fromcurrent": True, "transition": {"duration": 1000}}]),
+                                           "fromcurrent": True, "transition": {"duration": 500}}]),
                          dict(label="Pause",
                               method="animate",
                               args=[[None], {"frame": {"duration": 0, "redraw": False},
@@ -68,7 +68,7 @@ def ShowGridWorlds(grids_dict,title = ''):
         title=title,
         autosize=False,
         width=300 * (len(grids_dict) if len(grids_dict)<3 else 3),
-        height=160*float.__ceil__(len(grids_dict)/3),
+        height=120*float.__ceil__(len(grids_dict)/3),
         margin=dict(l=30, r=30, b=30, t=30)
     )
     fig.show()
