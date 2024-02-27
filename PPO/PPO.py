@@ -16,6 +16,8 @@ from torch.distributions import Normal, Categorical
 from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
 from tensorboardX import SummaryWriter
 
+from utils import utils
+
 # Parameters
 gamma = 0.99
 render = False
@@ -162,8 +164,8 @@ class PPO():
         return value.item()
 
     def save_param(self):
-        torch.save(self.actor_net.state_dict(), '../PPO_param/actor_net' + str(time.time())[:10], +'.pth')
-        torch.save(self.critic_net.state_dict(), '../PPO_param/critic_net' + str(time.time())[:10], +'.pth')
+        torch.save(self.actor_net.state_dict(), './PPO_result/actor_net' + utils.date+'epoch'+self.training_step, +'.pth')
+        torch.save(self.critic_net.state_dict(), './PPO_result/critic_net' + utils.date+'epoch'+self.training_step, +'.pth')
 
     def store_transition(self, transition):
         self.buffer.append(transition)
@@ -188,7 +190,7 @@ class PPO():
         #print("The agent is updateing....")
         for i in range(self.ppo_update_time):
             for index in BatchSampler(SubsetRandomSampler(range(len(self.buffer))), self.batch_size, False):
-                if self.training_step % 1000 ==0:
+                if self.training_step % 5 ==0:
                     print('I_ep {} , train {} times'.format(i_ep,self.training_step))
                 #with torch.no_grad():
                 Gt_index = Gt[index].view(-1, 1)
@@ -218,7 +220,7 @@ class PPO():
                 nn.utils.clip_grad_norm_(self.critic_net.parameters(), self.max_grad_norm)
                 self.critic_net_optimizer.step()
                 self.training_step += 1
-
+        self.save_param()
         del self.buffer[:] # clear experience
 
     
