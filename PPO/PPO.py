@@ -144,8 +144,8 @@ class PPO():
         self.training_step = 0
         self.writer = SummaryWriter('./PPO_result')
 
-        self.actor_optimizer = optim.Adam(self.actor_net.parameters(), 1e-3,weight_decay=0.5)
-        self.critic_net_optimizer = optim.Adam(self.critic_net.parameters(), 3e-3,weight_decay=0.5)
+        self.actor_optimizer = optim.Adam(self.actor_net.parameters(), 1e-3,weight_decay=0.2)
+        self.critic_net_optimizer = optim.Adam(self.critic_net.parameters(), 3e-3,weight_decay=0.2)
         # if not os.path.exists('../PPO_param'):
         #     os.makedirs('../PPO_param')
 
@@ -164,8 +164,13 @@ class PPO():
         return value.item()
 
     def save_param(self):
-        torch.save(self.actor_net.state_dict(), './PPO_result/actor_net' + utils.date+'epoch'+self.training_step, +'.pth')
-        torch.save(self.critic_net.state_dict(), './PPO_result/critic_net' + utils.date+'epoch'+self.training_step, +'.pth')
+        path = './PPO_result'
+        names = os.listdir(path)
+        for n in names:
+            if 'epoch' in n:
+                os.remove(path + '/' + n)
+        torch.save(self.actor_net.state_dict(), f'./PPO_result/actor_net_{utils.date}_epoch{self.training_step}.pth')
+        torch.save(self.critic_net.state_dict(),  f'./PPO_result/critic_net_{utils.date}_epoch{self.training_step}.pth')
 
     def store_transition(self, transition):
         self.buffer.append(transition)
@@ -176,6 +181,8 @@ class PPO():
         state = torch.tensor([t.state for t in self.buffer], dtype=torch.float)
         action = torch.tensor([t.action for t in self.buffer], dtype=torch.long).view(-1, 1)
         reward = [t.reward for t in self.buffer]
+        total_reward = np.array(reward).sum()
+        self.writer.add_scalar('reward', total_reward, global_step=self.training_step)
         # update: don't need next_state
         #reward = torch.tensor([t.reward for t in self.buffer], dtype=torch.float).view(-1, 1)
         #next_state = torch.tensor([t.next_state for t in self.buffer], dtype=torch.float)
