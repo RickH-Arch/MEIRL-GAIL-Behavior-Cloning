@@ -101,7 +101,6 @@ class RegionSensor(gym.Env):
         env_arr: 3D array,dim0:categoty of env,dim1:y_coord,dim2:x_coord
         '''
         return self.world.CalActionReward(env_arr)
-
 config = (
     PPOConfig().environment(
         env=RegionSensor,
