@@ -10,6 +10,7 @@ from itertools import count
 from collections import namedtuple
 Transition = namedtuple('Transition', ['state', 'action',  'a_log_prob', 'reward', 'next_state'])
 
+from tqdm import tqdm
 
 
 config = {
@@ -28,12 +29,12 @@ num_action = env.action_space.n
 print(f'num_state:{shape_state}')
 print(f'num_action:{num_action}')
 
-agent = PPO(shape_state,num_action,aPool_num = 1,actor_layers = [100,100,200],critic_layers=[100,100,50])
+agent = PPO(shape_state,num_action,aPool_num = 1,actor_layers = [100,100,100,200],critic_layers=[100,100,100,50])
 
 for i_epoch in range(1000):
     print(f"===== epoch {i_epoch} start =====")
     state = env.reset()[0]
-    for t in count():
+    for t in tqdm(range(env.max_step_count)):
         action,action_prob = agent.select_action(state)
         next_state,reward,done,*_ = env.step(action)
         next_state = next_state
@@ -42,5 +43,6 @@ for i_epoch in range(1000):
         state = next_state
         
         if done:
+            print('model updating...')
             if len(agent.buffer) >= agent.batch_size:agent.update(i_epoch)
             break
