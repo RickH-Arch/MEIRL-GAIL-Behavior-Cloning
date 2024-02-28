@@ -65,8 +65,12 @@ class DMEIRL:
             self.model.load_state_dict(torch.load(load))
 
         self.writer = None
+        self.info = f"{log}_lr{lr}_wd{weight_decay}_clip{clip_norm}_l{layers}"
+        self.result_path = f"train/{utils.date}/{self.info}"
+        if os.path.exists(self.result_path) == False:
+            os.makedirs(self.result_path)
         if log != "":
-            self.writer = SummaryWriter(f"./{log_dir}/DMEIRL_{log}_lr{lr}_wd{weight_decay}_clip{clip_norm}_l{layers}")
+            self.writer = SummaryWriter(f"./{log_dir}/DMEIRL_{self.info}")
 
     def train(self,n_epochs, save = True, demo = False,showInfo = False):
         self.rewards = []
@@ -183,28 +187,27 @@ class DMEIRL:
         return mu.sum(axis=1)
     
     def SyncRewards(self,epoch):
-        last_file = f"train/rewards_{self.model.name}_epoch{epoch}_{utils.date}.npy"
+        last_file = f"{self.result_path}/rewards_{self.model.name}_epoch{epoch}_{utils.date}.npy"
         if os.path.exists(last_file):
             os.remove(last_file)
-        np.save(f"train/rewards_{self.model.name}_epoch{epoch+1}_{utils.date}.npy" ,self.rewards)
+        np.save(f"{self.result_path}/rewards_{self.model.name}_epoch{epoch+1}_{utils.date}.npy" ,self.rewards)
     
     def SyncModel_MinMse(self,epoch,mse):
-        path = "train/"
-        file_names = os.listdir(path)
+        
+        file_names = os.listdir(self.result_path)
         for n in file_names:
             if 'mse' in n:
-                if os.path.exists(path+'/'+n):
-                    os.remove(path + '/' + n)
-        torch.save(self.model.state_dict(),f"train/model_{self.model.name}_epoch{epoch+1}_mse{mse}_{utils.date}.pth")
+                if os.path.exists(self.result_path+'/'+n):
+                    os.remove(self.result_path + '/' + n)
+        torch.save(self.model.state_dict(),f"{self.result_path}/model_{self.model.name}_epoch{epoch+1}_mse{mse}_{utils.date}.pth")
 
     def SyncModel_MinMax(self,epoch,max):
-        path = "train/"
-        file_names = os.listdir(path)
+        file_names = os.listdir(self.result_path)
         for n in file_names:
             if 'max' in n:
-                if os.path.exists(path+'/'+n):
-                    os.remove(path + '/' + n)
-        torch.save(self.model.state_dict(),f"train/model_{self.model.name}_epoch{epoch+1}_max{max}_{utils.date}.pth")
+                if os.path.exists(self.result_path+'/'+n):
+                    os.remove(self.result_path + '/' + n)
+        torch.save(self.model.state_dict(),f"{self.result_path}/model_{self.model.name}_epoch{epoch+1}_max{max}_{utils.date}.pth")
 
     def SaveModel(self,path):
         torch.save(self.model.state_dict(),path)
