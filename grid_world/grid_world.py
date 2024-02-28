@@ -374,13 +374,13 @@ class GridWorld:
         grid_plot.ShowGridWorld(self.count_grid)
 
     def ShowGridWorld_Count_log(self,title = "count_log"):
-        grid_plot.ShowGridWorld(np.log(self.count_grid+1),400,400,title=title)
+        grid_plot.ShowGridWorld(np.log(self.count_grid+1),500,400,title=title)
 
     def ShowGridWorld_Freq(self):
         grid_plot.ShowGridWorld(self.p_grid)
 
     def ShowGridWorld_Activated(self):
-        grid_plot.ShowGridWorld(self.GetActiveGrid(),width=450,title='Actived Grid World')
+        grid_plot.ShowGridWorld(self.GetActiveGrid(),width=600,title='Actived Grid World')
 
     def ShowRewardsResult(self,rewards,title = "Restored Rewards"):
         rewards = self.RewardsToMatrix(rewards)
@@ -391,6 +391,22 @@ class GridWorld:
         for reward in rewards:
             r.append(self.RewardsToMatrix(reward))
         grid_plot.ShowGridWorld_anime(r,480,400,title=title)
+
+    def ShowSVF(self,svf,title):
+        SVF_total = np.zeros((self.height,self.width))
+        for s in range(len(svf)):
+            s_now = self.fid_state[s]
+            x,y = grid_utils.StateToCoord(s_now,self.width)
+            SVF_total[y,x] = svf[s]
+        grid_plot.ShowGridWorld(SVF_total,title=title)
+
+    def ShowGridValue(self,value,title):
+        value_total = np.zeros((self.height,self.width))
+        for s in range(len(value)):
+            s_now = self.fid_state[s]
+            x,y = grid_utils.StateToCoord(s_now,self.width)
+            value_total[y,x] = value[s]
+        grid_plot.ShowGridWorld(value_total,title=title)
 
     def RewardsToMatrix(self,rewards):
         rewards_matrix = np.zeros((self.height,self.width))
