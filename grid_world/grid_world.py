@@ -322,7 +322,8 @@ class GridWorld:
         x,y = self.StateToCoord(state)
         vs = []
         if type(values) == dict:
-            for value in values.values():
+            values = values.values()
+            for value in values:
                 vs.append(value[y,x])
         else:
             for value in values:
@@ -373,13 +374,13 @@ class GridWorld:
         grid_plot.ShowGridWorld(self.count_grid)
 
     def ShowGridWorld_Count_log(self,title = "count_log"):
-        grid_plot.ShowGridWorld(np.log(self.count_grid+1),500,400,title=title)
+        grid_plot.ShowGridWorld(np.log(self.count_grid+1),400,400,title=title)
 
     def ShowGridWorld_Freq(self):
         grid_plot.ShowGridWorld(self.p_grid)
 
     def ShowGridWorld_Activated(self):
-        grid_plot.ShowGridWorld(self.GetActiveGrid())
+        grid_plot.ShowGridWorld(self.GetActiveGrid(),width=450,title='Actived Grid World')
 
     def ShowRewardsResult(self,rewards,title = "Restored Rewards"):
         rewards = self.RewardsToMatrix(rewards)
@@ -389,7 +390,7 @@ class GridWorld:
         r = []
         for reward in rewards:
             r.append(self.RewardsToMatrix(reward))
-        grid_plot.ShowGridWorld_anime(r,500,400,title=title)
+        grid_plot.ShowGridWorld_anime(r,480,400,title=title)
 
     def RewardsToMatrix(self,rewards):
         rewards_matrix = np.zeros((self.height,self.width))
