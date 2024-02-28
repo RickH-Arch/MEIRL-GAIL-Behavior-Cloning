@@ -7,7 +7,8 @@ from utils import utils
 from DMEIRL.value_iteration import value_iteration
 import torch
 import torch.nn as nn
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+#device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:0")
 from PIL import Image
 import os
 from tqdm import tqdm
@@ -36,9 +37,9 @@ class GridWorld_envGen(GridWorld):
         self.width = width
         self.height = height
         
-        model = DeepMEIRL_FC(n_input=4,layers=(16,16))
-        model.to('cuda')
-        model.load_state_dict(torch.load(model_path))
+        model = DeepMEIRL_FC(n_input=4,layers=(16,32,32,16))
+        model.to(device)
+        model.load_state_dict(torch.load(model_path,map_location='cuda:0'))
         model.eval()
         model.cuda()
         self.model = model
@@ -55,12 +56,15 @@ class GridWorld_envGen(GridWorld):
         #----calculate original svf & init_prob----
         self.prob_initial_state = self.__getInitialStatesProb()
         self.SVF_origin = self.StateVisitationFrequency()
+        self.SVF_origin_simu = self.Expected_StateVisitationFrequency(self.parser.environments_arr)
         self.ShowSVF(self.SVF_origin,'Original SVF')
+        self.ShowReward(self.reward_now)
+        self.ShowSVF(self.SVF_origin_simu,'Simulated SVF')
         self.SVF_target = self.GetTargetSVF(target_svf_delta)
         self.ShowSVF(self.SVF_target,'Target SVF')
 
     def GetTargetSVF(self,target_svf_delta:dict):
-        target_svf = self.SVF_origin.clone()
+        target_svf = self.SVF_origin_simu.clone()
         for state,delta in target_svf_delta.items():
             s = self.state_fid[state]
             target_svf[s] += delta
@@ -75,7 +79,21 @@ class GridWorld_envGen(GridWorld):
                 svf[index] += 1
         return svf/len(self.experts.trajs)
     
-    def Expected_StateVisitationFrequency(self,policy):
+    
+    def Expected_StateVisitationFrequency(self,envs_arr):
+        envs_arr = np.array(envs_arr)
+        if envs_arr.shape[1] != self.height or envs_arr.shape[2] != self.width:
+            raise ValueError("envs_arr shape not match")
+        #get features
+        features_arr = self.parser.GetFeaturesFromEnvs2DArray(envs_arr)
+        state_features = self.GetStatesValueFromArr(features_arr)
+        features_arr_active,_,_ = self.GetAvtiveFeatureArr(state_features)
+        features = torch.from_numpy(features_arr_active).float().to(device)
+        #get rewards
+        rewards = self.model(features).flatten()
+        self.reward_now = rewards.detach().cpu().numpy()
+        #compute exp_svf
+        policy = value_iteration(0.001,self,rewards.detach(),self.discount,demo=True)
         #probability of visiting the initial state
         policy = policy.cpu().numpy()
         #print("Expected_StateVisitationFrequency start")
@@ -93,18 +111,7 @@ class GridWorld_envGen(GridWorld):
         
     
     def CalActionReward(self,envs_arr):
-        if envs_arr.shape[1] != self.height or envs_arr.shape[2] != self.width:
-            raise ValueError("envs_arr shape not match")
-        #get features
-        features_arr = self.parser.GetFeaturesFromEnvs2DArray(envs_arr)
-        state_features = self.GetStatesValueFromArr(features_arr)
-        features_arr_active,_,_ = self.GetAvtiveFeatureArr(state_features)
-        features = torch.from_numpy(features_arr_active).float().to(device)
-        #get rewards
-        rewards = self.model(features).flatten()
-        #compute exp_svf
-        policy = value_iteration(0.001,self,rewards.detach(),self.discount,demo=True)
-        exp_svf = self.Expected_StateVisitationFrequency(policy)
+        exp_svf = self.Expected_StateVisitationFrequency(envs_arr)
         return -self.__calSVFLoss(exp_svf).cpu().numpy()
         
 
