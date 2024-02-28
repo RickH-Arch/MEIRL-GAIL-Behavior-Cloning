@@ -14,6 +14,25 @@ from datetime import datetime
 current_time = datetime.now()
 date = str(current_time.month)+str(current_time.day)
 
+import plotly.io as pio
+
+try:
+    img_path = os.getcwd()+'/wifi_track_data/dacang/imgs/roads.png'
+    img = Image.open(img_path)
+    background_img = img
+    buttom_img = Image.fromarray(np.array(img.transpose(Image.FLIP_TOP_BOTTOM))).convert('P', palette='WEB', dither=None)
+except:
+    print("no background image")
+    background_img = Image.fromarray(np.ones((300,400,3), dtype='uint8')).convert('P', palette='WEB')
+    buttom_img = Image.fromarray(np.ones((300,400,3), dtype='uint8')).convert('P', palette='WEB')
+
+dum_img = Image.fromarray(np.ones((3,3,3), dtype='uint8')).convert('P', palette='WEB')
+idx_to_color = np.array(dum_img.getpalette()).reshape((-1, 3))
+colorscale=[[i/255.0, "rgb({}, {}, {})".format(*rgb)] for i, rgb in enumerate(idx_to_color)]
+im_x = np.linspace(0, 40, 40)
+im_y = np.linspace(0, 30, 30)
+im_z = np.zeros((30,40))
+
 def ShowGridWorld(grid,width = 600,height = 450,title = "Grid World"):
     fig = go.Figure(data=go.Heatmap(
                     z=grid,))
@@ -158,8 +177,76 @@ def ShowTraj(track,width,height,title='traks'):
         margin=dict(l=50, r=50, b=50, t=50),
     )
     fig.show()
+
+def PrintTraj3D(x,y,z,x_name = "",y_name = "",z_name = "",marker_size = 3,line_width = 3,save_path=''):
+    fig = go.Figure()
+    fig.add_trace(go.Scatter3d(
+    x=x, 
+    y=y, 
+    z=z,
     
+    marker=dict(
+        color=z,
+        colorscale='Viridis',
+        size=marker_size,
+    ),
+    line=dict(
+        color='rgba(50,50,50,0.6)',
+        width=line_width,
         
+    )
+    ))
+
+    #add buttom background image
+    fig.add_trace(go.Surface(x=im_x, y=im_y, z=im_z,
+        surfacecolor=buttom_img, 
+        cmin=0, 
+        cmax=255,
+        colorscale=colorscale,
+        showscale=False,
+        lighting_diffuse=1,
+        lighting_ambient=1,
+        lighting_fresnel=1,
+        lighting_roughness=1,
+        lighting_specular=0.5,
+    ))
+
+    fig.update_layout(
+        width=300,
+        height=300,
+        autosize=True,
+        scene=dict(
+            camera=dict(
+                up=dict(
+                    x=0,
+                    y=0,
+                    z=1
+                ),
+                eye=dict(
+                    x=0,
+                    y=-1,
+                    z=1,
+                )
+            ),
+            xaxis_visible=True,
+                yaxis_visible=True, 
+                zaxis_visible=True, 
+                xaxis_title="X",
+                yaxis_title="Y",
+                zaxis_title="hour" ,
+            aspectmode = 'manual',
+            aspectratio=dict(x=1, y=0.75, z=0.75),
+            xaxis = dict(nticks=4, range=[0,40],),
+            yaxis = dict(nticks=4, range=[0,30],),
+            zaxis = dict(nticks=4, ),
+        ),
+    )
+
+
+    # if os.path.exists(save_path) == False:
+    #     os.makedirs(save_path)
+    #pio.write_image(fig,'traj.png')
+    fig.show()
 
 
 

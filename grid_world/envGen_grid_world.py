@@ -15,6 +15,8 @@ from tqdm import tqdm
 import sys
 sys.path.append("../")
 from DMEIRL.DeepMEIRL_FC import DeepMEIRL_FC
+import random
+
 
 class GridWorld_envGen(GridWorld):
     '''
@@ -29,15 +31,17 @@ class GridWorld_envGen(GridWorld):
     def __init__(self,width,height,
                  envs_img_folder_path,
                  experts_traj_filePath,
-                 target_svf_delta:dict,#key:state_active, value:delta
                  model_path,# nn model that convert features of particuler state to reward
+                 model_n_input,#demo:4
+                 model_layers,#demo:16,32,32,16
+                 target_svf_delta:dict = {},#key:state_active, value:delta
                  trans_prob = 0.6,
                  discount = 0.98,
                  ):
         self.width = width
         self.height = height
         
-        model = DeepMEIRL_FC(n_input=4,layers=(16,32,32,16))
+        model = DeepMEIRL_FC(n_input=model_n_input,layers=model_layers)
         model.to(device)
         model.load_state_dict(torch.load(model_path,map_location='cuda:0'))
         model.eval()
@@ -55,13 +59,14 @@ class GridWorld_envGen(GridWorld):
         
         #----calculate original svf & init_prob----
         self.prob_initial_state = self.__getInitialStatesProb()
-        self.SVF_origin = self.StateVisitationFrequency()
+        #self.SVF_origin = self.StateVisitationFrequency()
         self.SVF_origin_simu = self.Expected_StateVisitationFrequency(self.parser.environments_arr)
-        self.ShowSVF(self.SVF_origin,'Original SVF')
+        #self.ShowSVF(self.SVF_origin,'Original SVF')
         self.ShowReward(self.reward_now)
         self.ShowSVF(self.SVF_origin_simu,'Simulated SVF')
-        self.SVF_target = self.GetTargetSVF(target_svf_delta)
-        self.ShowSVF(self.SVF_target,'Target SVF')
+        if len(target_svf_delta)>0:
+            self.SVF_target = self.GetTargetSVF(target_svf_delta)
+            self.ShowSVF(self.SVF_target,'Target SVF')
 
     def GetTargetSVF(self,target_svf_delta:dict):
         target_svf = self.SVF_origin_simu.clone()
@@ -69,7 +74,10 @@ class GridWorld_envGen(GridWorld):
             s = self.state_fid[state]
             target_svf[s] += delta
         return target_svf
-        
+    
+    def ShowSVFOrigin(self):
+        self.SVF_origin = self.StateVisitationFrequency()
+        self.ShowSVF(self.SVF_origin,'Original SVF')
 
     def StateVisitationFrequency(self):
         svf = torch.zeros(self.n_states_active,dtype=torch.float32).to(device)
@@ -79,6 +87,9 @@ class GridWorld_envGen(GridWorld):
                 svf[index] += 1
         return svf/len(self.experts.trajs)
     
+    def RefreshInitState(self):
+        self.prob_initial_state = self.__getInitialStatesProb()
+        self.ShowGridValue(self.prob_initial_state,title='initial state probability')
     
     def Expected_StateVisitationFrequency(self,envs_arr):
         envs_arr = np.array(envs_arr)
@@ -107,7 +118,8 @@ class GridWorld_envGen(GridWorld):
                 mu[t,:] = torch.matmul(mu[t-1,:],x)
 
         return mu.sum(dim = 0)
-            
+    
+    
         
     
     def CalActionReward(self,envs_arr):
@@ -129,11 +141,64 @@ class GridWorld_envGen(GridWorld):
         prob_initial_state = prob_initial_state/self.experts.trajs_count
         return prob_initial_state
     
-    #-------------------------plot--------------------------
-    def ShowSVF(self,svf,title):
-        SVF_total = np.zeros((self.height,self.width))
-        for s in range(len(svf)):
-            s_now = self.fid_state[s]
-            x,y = grid_utils.StateToCoord(s_now,self.width)
-            SVF_total[y,x] = svf[s]
-        grid_plot.ShowGridWorld(SVF_total,title=title)
+    #-------------------------traj--------------------------
+    def reset(self,random_init = True):
+        if random_init:
+            index = np.random.randint(self.n_states_active)
+            self.state = self.fid_state[index]
+        else:
+            if len(self.prob_initial_state)>0:
+                self.state = random.choices(range(len(self.prob_initial_state)),weights=self.prob_initial_state)[0]
+            else:
+                self.state = 0
+        self.state = self.fid_state[self.state]
+        return self.state
+    
+    def step(self, a):
+        index = self.state_fid[self.state]
+        probs = self.dynamics_fid[index, a, :]
+        index = np.random.choice(self.n_states_active, p=probs)
+        self.state = self.fid_state[index]
+        return self.state
+    
+    def GenerateTrajs(self,traj_count,traj_length,save = False):
+        reward = torch.from_numpy(self.reward_now).to('cuda:0')
+        policy = value_iteration(0.0001,self,reward,self.discount).argmax(1)
+        policy = policy.cpu().numpy()
+        trajs = []
+        for i in tqdm(range(traj_count)):
+            traj = []
+            state = self.reset(random_init=False)
+            for j in range(traj_length):
+                index = self.state_fid[state]
+                action = policy[index]
+                next_state = self.step(action)
+                traj.append((state,action,next_state))
+                state = next_state
+            trajs.append(traj)
+        m = np.array(range(1,(len(trajs)+1)))
+        df_trajs = pd.DataFrame({'m':m,'trajs':trajs})
+        if save:
+            df_trajs.to_csv(f'learned_trajs_{utils.date}.csv',index=False)
+        self.df_trajs = df_trajs
+        return df_trajs
+    
+    def PrintTrajs(self,index = -1,save_path=''):
+        for ind,row in self.df_trajs.iterrows():
+            if index != -1:
+                if ind != index:
+                    continue
+            x = []
+            y = []
+            t = []
+            for i,pair in enumerate(row.trajs):
+                coord = self.StateToCoord(pair[0])
+                x.append(coord[0])
+                y.append(coord[1])
+                t.append(i)
+            grid_plot.PrintTraj3D(x,y,t)
+            
+    
+
+        
+        
