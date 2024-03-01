@@ -216,7 +216,7 @@ class DMEIRL:
         compare = nn.MSELoss()
         with torch.no_grad():
             com = compare(torch.from_numpy(svf1).float(),torch.from_numpy(svf2).float())
-        return com
+        return com*100
     
     def CompareWithRealReward(self,reward_now):
         compare = nn.MSELoss()

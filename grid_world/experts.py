@@ -23,6 +23,7 @@ class Experts:
         
         self.trajs_all = self.df_trajs_all['trajs'].tolist()
         self.traj_all_avg_length = int(np.mean(self.df_trajs_all['trajs'].apply(lambda x:len(x))))
+        print(f"trajs all avg length: {self.traj_all_avg_length}")
         self.mac_list = self.df_trajs_all['m'].tolist()
         self.traj_all_lens = self.df_trajs_all['trajs'].apply(lambda x:len(x)).tolist()
 
