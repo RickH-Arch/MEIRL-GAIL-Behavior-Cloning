@@ -23,8 +23,25 @@ print("GridWorld initialized")
 
 #------------------------------------Initialize DMEIRL------------------------------------------
 
-dme = DMEIRL(world,layers=(60,120,240,120,60),lr=0.0001,weight_decay=0.2,log=f'{utils.date}sliced_v0.001_tp{world.trans_prob}_dis{world.discount}',log_dir='run')
+#dme = DMEIRL(world,layers=(60,120,240,120,60),lr=0.0001,weight_decay=0.2,log=f'{utils.date}sliced_bias{world.traj_len_bias}_v0.001_tp{world.trans_prob}_dis{world.discount}',log_dir='run_sliced')
 
 #------------------------------------Train------------------------------------------
 
-dme.train(n_epochs=8000)
+#dme.train(n_epochs=500)
+
+layers_list = [(60,120,60),(60,240,60),(120,240,120),(60,120,240,120,60),(60,120,240,240,120,60)]
+wd_list = [0.2,0.5,1]
+bias_list = [0,10,15,20]
+
+total_count = len(layers_list)*len(wd_list)*len(bias_list)
+count = 1
+for bias in bias_list:
+    world.experts.ChangeTrajLenBias(bias)
+    for wd in wd_list:
+        for l in layers_list:
+            dme = DMEIRL(world,layers=l,lr=0.0001,weight_decay=wd,log=f'{utils.date}sliced_bias{world.experts.bias}_v0.001_tp{world.trans_prob}_dis{world.discount}',log_dir='run_sliced')
+            print(f"----------------{dme.info}----------------")
+            print(f"----------------start{count}/{total_count}----------------")
+            dme.train(n_epochs=400,demo=True,save=True)
+            count+=1
+
