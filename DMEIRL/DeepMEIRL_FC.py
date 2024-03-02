@@ -91,7 +91,7 @@ class DMEIRL:
                 self.rewards.append(reward.detach().cpu().numpy())
 
             #save rewards
-            if save and not demo:
+            if save:
                 self.SyncRewards(i)
 
             #compute grad
@@ -128,7 +128,7 @@ class DMEIRL:
             self.optimizer.step()
             
             #save model
-            if save and not demo:
+            if save:
                 if last_mse>mse:
                     self.SyncModel_MinMse(i,mse)
                     last_mse = mse

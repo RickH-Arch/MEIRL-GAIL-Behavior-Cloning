@@ -11,8 +11,10 @@ from datetime import datetime
 current_time = datetime.now()
 date = str(current_time.month)+str(current_time.day)
 
+
+
 class Experts:
-    def __init__(self,width,height,trajs_file_path = None,df_trajs = None):
+    def __init__(self,width,height,trajs_file_path = None,df_trajs = None,bias = 0):
         self.width = width
         self.height = height
         
@@ -22,7 +24,7 @@ class Experts:
             self.df_trajs_all = df_trajs
         
         self.trajs_all = self.df_trajs_all['trajs'].tolist()
-        self.traj_all_avg_length = int(np.mean(self.df_trajs_all['trajs'].apply(lambda x:len(x))))
+        self.traj_all_avg_length = int(np.mean(self.df_trajs_all['trajs'].apply(lambda x:len(x))))+bias
         print(f"trajs all avg length: {self.traj_all_avg_length}")
         self.mac_list = self.df_trajs_all['m'].tolist()
         self.traj_all_lens = self.df_trajs_all['trajs'].apply(lambda x:len(x)).tolist()
@@ -34,6 +36,7 @@ class Experts:
         self.trajs_count = len(self.trajs)
         self.traj_avg_length = self.traj_all_avg_length
         self.cluster_now = -1
+        self.bias = bias
         
 
     def ReadExpertTrajs(self,trajs_file_path):
@@ -44,6 +47,12 @@ class Experts:
         
     def GetExpertTraj(self,m):
         return self.df_trajs[self.df_trajs['m']==m]['trajs'].tolist()[0]
+    
+    def ChangeTrajLenBias(self,b):
+        self.traj_all_avg_length = int(np.mean(self.df_trajs_all['trajs'].apply(lambda x:len(x))))+b
+        self.traj_avg_length = self.traj_all_avg_length
+        self.bias = b
+
     
     def GetClusteredTrajAvgLength(self,cluster_now):
         if self.cluster_now != cluster_now:
@@ -105,5 +114,5 @@ class Experts:
             raise ValueError("Must read cluster result first")
         self.df_trajs = self.df_trajs_all[self.df_trajs_all['cluster'].isin(c_set)].reset_index(drop=True)
         self.trajs = self.df_trajs['trajs'].tolist()
-        self.traj_avg_length = int(np.mean(self.df_trajs['trajs'].apply(lambda x:len(x))))
+        self.traj_avg_length = int(np.mean(self.df_trajs['trajs'].apply(lambda x:len(x))))+bias
         print(f"applied clusterd trajs num: {len(self.df_trajs)}")
