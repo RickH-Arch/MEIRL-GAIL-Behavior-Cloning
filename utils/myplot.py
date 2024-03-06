@@ -373,7 +373,7 @@ def Boxes(list_tuple,box_title = ""):
         row=1, col=i+1
     )
     fig.update_traces(boxpoints='all', jitter=.2)
-    fig.update_layout(height=400, width=150*len(list_tuple))
+    fig.update_layout(height=400, width=250*len(list_tuple))
     
     if box_title == "":
         fig.update_layout(title_text="Box Plot")
@@ -418,8 +418,8 @@ def Track_3D(x,y,z,x_name = "",y_name = "",z_name = "",marker_size = 3,line_widt
     ))
 
     fig.update_layout(
-        width=500,
-        height=500,
+        width=1000,
+        height=1000,
         autosize=True,
         scene=dict(
             camera=dict(
