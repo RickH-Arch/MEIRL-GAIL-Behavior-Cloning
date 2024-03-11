@@ -94,7 +94,7 @@ class DMEIRL:
                 self.rewards.append(reward.detach().cpu().numpy())
 
             #save rewards
-            if save and not demo:
+            if save:
                 self.SyncRewards(i)
 
             #compute grad
@@ -133,7 +133,7 @@ class DMEIRL:
             
 
             #save model
-            if save and not demo:
+            if save:
                 if last_mse>mse:
                     self.SyncModel_MinMse(i,mse)
                     last_mse = mse
@@ -222,7 +222,7 @@ class DMEIRL:
         compare = nn.MSELoss()
         with torch.no_grad():
             com = compare(torch.from_numpy(svf1).float(),torch.from_numpy(svf2).float())
-        return com
+        return com*100
     
     def CompareWithRealReward(self,reward_now):
         compare = nn.MSELoss()

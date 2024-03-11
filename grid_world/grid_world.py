@@ -27,7 +27,8 @@ class GridWorld:
                  discount = 0.98,
                  active_all = False,
                  manual_deact_states = [],
-                 real_reward_mat = []) -> None:
+                 real_reward_mat = [],
+                 traj_length_bias = 0) -> None:
         self.width = width
         self.height = height
         
@@ -35,6 +36,7 @@ class GridWorld:
         self.discount = discount
         self.active_all = active_all
         self.manual_deact_states = manual_deact_states
+        self.traj_len_bias = traj_length_bias
 
         
         
@@ -42,9 +44,9 @@ class GridWorld:
         self.experts = None
         try:
             if expert_traj_filePath:
-                self.experts = Experts(self.width,self.height,trajs_file_path=expert_traj_filePath)
+                self.experts = Experts(self.width,self.height,trajs_file_path=expert_traj_filePath,bias=traj_length_bias)
             elif any(expert_trajs):
-                self.experts = Experts(self.width,self.height,df_trajs=expert_trajs)
+                self.experts = Experts(self.width,self.height,df_trajs=expert_trajs,bias = traj_length_bias)
         except:
             pass
              
