@@ -418,8 +418,8 @@ def Track_3D(x,y,z,x_name = "",y_name = "",z_name = "",marker_size = 3,line_widt
     ))
 
     fig.update_layout(
-        width=1000,
-        height=1000,
+        width=400,
+        height=400,
         autosize=True,
         scene=dict(
             camera=dict(
@@ -449,6 +449,107 @@ def Track_3D(x,y,z,x_name = "",y_name = "",z_name = "",marker_size = 3,line_widt
     )
     
     
+
+    fig.show()
+
+def Track_3D_sliced(df_list,df_wifipos,df_path,mac='',marker_size = 3,line_width = 3):
+    track_list = []
+    for i,df in enumerate(df_list):
+        if mac != '':
+            df_now = utils.GetDfNow(df,mac)
+        else:
+            df_now = df
+        x,y,z = utils.GetPathPointsWithUniformDivide(df_now,df_wifipos,df_path)
+        track_list.append([[x,y,z],f"path{i+1}"])
+    if len(track_list) == 0:
+        return
+
+    col_num = 3
+    row_num = float.__ceil__(len(track_list)/col_num)
+
+    #get specs
+    list_specs = []
+    for i in range(row_num):
+        l = []
+        for j in range(col_num):
+            l.append({'type':'scatter3d'})
+        list_specs.append(l)
+
+    #get name tuple
+    name_list = []
+    for i in range(len(track_list)):
+        name_list.append(track_list[i][1])
+    name_tuple = tuple(name_list)
+
+    fig = make_subplots(
+        rows=row_num, cols=col_num,
+        specs=list_specs,
+        subplot_titles=name_tuple
+    )
+
+    for i in range(len(track_list)):
+        t = track_list[i]
+        row_loc = int(i/col_num)+1
+        col_loc = i%col_num+1
+        fig.add_trace(
+            go.Scatter3d(
+                x=t[0][0], 
+                y=t[0][1], 
+                z=t[0][2],
+                
+                marker=dict(
+                    color=z,
+                    colorscale='Viridis',
+                    size=marker_size,
+                ),
+                line=dict(
+                    color='rgba(50,50,50,0.6)',
+                    width=line_width,
+                ),
+            ),
+            row=row_loc, col=col_loc,
+        )
+        fig.add_trace(go.Surface(x=im_x, y=im_y, z=im_z,
+            surfacecolor=buttom_img, 
+            cmin=0, 
+            cmax=255,
+            colorscale=colorscale,
+            showscale=False,
+            lighting_diffuse=1,
+            lighting_ambient=1,
+            lighting_fresnel=1,
+            lighting_roughness=1,
+            lighting_specular=0.5,
+        ),
+        row=row_loc, col=col_loc,)
+    fig.update_layout(
+        title_text='Track Restore Result',
+        height=350*row_num,
+        width=1000,
+        showlegend = False
+    )
+
+    fig.update_scenes(xaxis = dict(nticks=4,range=[0,400]),
+                      yaxis = dict(nticks=4,range=[0,300]),
+                      zaxis = dict(nticks=4,range=[0,24]),
+                        aspectratio=dict(x=1, y=0.75, z=0.75),
+                        
+                        camera=dict(
+                            up=dict(
+                                x=0,
+                                y=0,
+                                z=1
+                            ),
+                            eye=dict(
+                                x=0,
+                                y=-1,
+                                z=1,
+                            ),
+                        ),
+                        xaxis_title="X",
+                        yaxis_title="Y",
+                        zaxis_title="hour" ,
+                        )
 
     fig.show()
 

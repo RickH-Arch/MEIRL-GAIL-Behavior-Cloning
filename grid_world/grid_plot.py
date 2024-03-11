@@ -86,7 +86,7 @@ def ShowGridWorlds(grids_dict,title = ''):
     fig.update_layout(
         title=title,
         autosize=False,
-        width=300 * (len(grids_dict) if len(grids_dict)<3 else 3),
+        width=240 * (len(grids_dict) if len(grids_dict)<3 else 3),
         height=120*float.__ceil__(len(grids_dict)/3),
         margin=dict(l=30, r=30, b=30, t=30)
     )
