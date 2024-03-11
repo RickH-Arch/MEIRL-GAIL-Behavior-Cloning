@@ -77,7 +77,7 @@ class DataParser:
         for file_name in file_names:
             imgs.append(Image.open(folder_path + "/" + file_name))
         for i in tqdm(range(len(imgs)),desc="parsing environments from folder:"):
-            self.ParseEnvironmentFromImage(imgs[i],feature_name=file_names[i],save_path='')
+            self.ParseEnvironmentFromImage(imgs[i],feature_name=file_names[i].split('.')[0],save_path='')
     
     def ParseEnvironments(self,image_list,feature_name_list):
         for i in range(len(image_list)):

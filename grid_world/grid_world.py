@@ -410,14 +410,15 @@ class GridWorld:
 
     def RewardsToMatrix(self,rewards):
         rewards_matrix = np.zeros((self.height,self.width))
-        for i in range(len(rewards)):
-            state = self.fid_state[i]
-            coord = self.StateToCoord(state)
-            rewards_matrix[coord[1],coord[0]] = rewards[i]
         for i in range(self.height):
             for j in range(self.width):
                 if rewards_matrix[i,j] == 0:
                     rewards_matrix[i,j] = np.nan
+        for i in range(len(rewards)):
+            state = self.fid_state[i]
+            coord = self.StateToCoord(state)
+            rewards_matrix[coord[1],coord[0]] = rewards[i]
+        
         return rewards_matrix
 
 

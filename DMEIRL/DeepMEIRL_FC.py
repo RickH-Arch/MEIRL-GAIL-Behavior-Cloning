@@ -34,7 +34,8 @@ class DeepMEIRL_FC(nn.Module):
             self.net.append(nn.ELU())
             n_input = l
         self.net.append(nn.Linear(n_input,1))
-        self.net.append(nn.Sigmoid())
+        #self.net.append(nn.Sigmoid())
+        self.net.append(nn.ReLU())
         self.net = nn.Sequential(*self.net)
 
         #Xavier Initialize
@@ -77,6 +78,8 @@ class DMEIRL:
         svf = self.StateVisitationFrequency()
         com_last = 100
         reward = self.model(self.features).flatten()
+        best_reward = reward
+        best_iter = 0
         self.rewards.append(reward.detach().cpu().numpy())
         self.exploded = False
 
@@ -127,20 +130,23 @@ class DMEIRL:
                     print("total_norm:",total_norm)
             self.optimizer.step()
             
+            
+
             #save model
             if save and not demo:
                 if last_mse>mse:
                     self.SyncModel_MinMse(i,mse)
                     last_mse = mse
+                    best_reward = reward
+                    best_iter=i
                 if last_max>max:
                     self.SyncModel_MinMax(i,max)
                     last_max = max
 
+            with torch.no_grad():
+                reward = self.model.forward(self.features).flatten()
 
-        with torch.no_grad():
-            reward = self.model.forward(self.features).flatten()
-
-        return reward.detach().cpu().numpy(),self.rewards
+        return best_reward.detach().cpu().numpy(),best_iter,self.rewards
 
     def StateVisitationFrequency(self):
         svf = torch.zeros(self.world.n_states_active,dtype=torch.float32).to(device)
