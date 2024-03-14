@@ -34,8 +34,9 @@ class DeepMEIRL_FC(nn.Module):
             self.net.append(nn.ELU())
             n_input = l
         self.net.append(nn.Linear(n_input,1))
-        #self.net.append(nn.Sigmoid())
-        self.net.append(nn.ReLU())
+        self.net.append(nn.Sigmoid())
+        #self.net.append(nn.ReLU())
+        #self.net.append(nn.Tanh())
         self.net = nn.Sequential(*self.net)
 
         #Xavier Initialize
@@ -120,7 +121,6 @@ class DMEIRL:
                 self.writer.add_scalar('reward delta',reward_delta,i)
 
             
-
             #update model
             self.optimizer.zero_grad()
             reward.backward(-r_grad)
@@ -226,8 +226,13 @@ class DMEIRL:
     
     def CompareWithRealReward(self,reward_now):
         compare = nn.MSELoss()
+        target_min = self.world.real_reward_arr.min()
+        target_max = self.world.real_reward_arr.max()
+        source_min = reward_now.min()
+        source_max = reward_now.max()
+        scaled_reward = target_min + ((reward_now- source_min) * (target_max - target_min)) / (source_max - source_min)
         with torch.no_grad():
-            com = compare(torch.from_numpy(reward_now).float(),torch.from_numpy(self.world.real_reward_arr).float())
+            com = compare(torch.from_numpy(scaled_reward).float(),torch.from_numpy(self.world.real_reward_arr).float())
             #print(f"=====reward compare: {com}=====")
             return com
 

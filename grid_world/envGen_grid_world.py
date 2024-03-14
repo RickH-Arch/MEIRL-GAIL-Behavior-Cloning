@@ -88,8 +88,8 @@ class GridWorld_envGen(GridWorld):
         return svf/len(self.experts.trajs)
     
     def RefreshInitState(self):
-        self.prob_initial_state = self.__getInitialStatesProb()
-        self.ShowGridValue(self.prob_initial_state,title='initial state probability')
+        self.prob_initial_state = self.__getInitialStatesProb().cpu().numpy()
+        self.ShowGrid3DBarChart(self.prob_initial_state,title='initial state probability')
     
     def Expected_StateVisitationFrequency(self,envs_arr):
         envs_arr = np.array(envs_arr)

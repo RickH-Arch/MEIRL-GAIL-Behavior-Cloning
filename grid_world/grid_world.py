@@ -410,6 +410,14 @@ class GridWorld:
             value_total[y,x] = value[s]
         grid_plot.ShowGridWorld(value_total,title=title)
 
+    def ShowGrid3DBarChart(self,value,title):
+        coords = []
+        for i in range(len(value)):
+            s = self.fid_state[i]
+            x,y = grid_utils.StateToCoord(s,self.width)
+            coords.append([x*10,y*10])
+        grid_plot.BarChart_3D(coords,value)
+
     def RewardsToMatrix(self,rewards):
         rewards_matrix = np.zeros((self.height,self.width))
         for i in range(self.height):
