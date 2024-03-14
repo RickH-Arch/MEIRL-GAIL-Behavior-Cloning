@@ -14,6 +14,8 @@ from datetime import datetime
 current_time = datetime.now()
 date = str(current_time.month)+str(current_time.day)
 
+import math
+
 import plotly.io as pio
 
 try:
@@ -29,9 +31,12 @@ except:
 dum_img = Image.fromarray(np.ones((3,3,3), dtype='uint8')).convert('P', palette='WEB')
 idx_to_color = np.array(dum_img.getpalette()).reshape((-1, 3))
 colorscale=[[i/255.0, "rgb({}, {}, {})".format(*rgb)] for i, rgb in enumerate(idx_to_color)]
-im_x = np.linspace(0, 40, 40)
-im_y = np.linspace(0, 30, 30)
-im_z = np.zeros((30,40))
+im_x = np.linspace(0, 400, 400)
+im_y = np.linspace(0, 300, 300)
+im_z = np.zeros((300,400))
+
+colors = ['rgb(67,67,67)', 'rgb(115,115,115)']
+line_size = [2,2,2,2]
 
 def ShowGridWorld(grid,width = 600,height = 450,title = "Grid World"):
     fig = go.Figure(data=go.Heatmap(
@@ -73,6 +78,165 @@ def ShowGridWorld_anime(grids,width = 600,height = 450,title = "Grid World"):
         
     fig.show()
 
+def barchart3d(labels, z_data, title, z_title,
+               n_row=0, width=900, height=900, thikness=0.7, colorscale='Viridis',
+               **kwargs):
+    """
+    Draws a 3D barchart
+    :param labels: Array_like of bar labels
+    :param z_data: Array_like of bar heights (data coords)
+    :param title: Chart title
+    :param z_title: Z-axis title
+    :param n_row: Number of x-rows
+    :param width: Chart width (px)
+    :param height: Chart height (px)
+    :param thikness: Bar thikness (0; 1)
+    :param colorscale: Barchart colorscale
+    :param **kwargs: Passed to Mesh3d()
+    :return: 3D barchart figure
+    """
+
+    if n_row < 1:
+        n_row = math.ceil(math.sqrt(len(z_data)))
+    thikness *= 0.5
+    ann = []
+    
+    fig = go.Figure()
+
+    for iz, z_max in enumerate(z_data):
+        x_cnt, y_cnt = iz % n_row, iz // n_row
+        x_min, y_min = x_cnt - thikness, y_cnt - thikness
+        x_max, y_max = x_cnt + thikness, y_cnt + thikness
+
+        fig.add_trace(go.Mesh3d(
+            x=[x_min, x_min, x_max, x_max, x_min, x_min, x_max, x_max],
+            y=[y_min, y_max, y_max, y_min, y_min, y_max, y_max, y_min],
+            z=[0, 0, 0, 0, z_max, z_max, z_max, z_max],
+            alphahull=0,
+            intensity=[0, 0, 0, 0, z_max, z_max, z_max, z_max],
+            coloraxis='coloraxis',
+            hoverinfo='skip',
+            **kwargs))
+
+        ann.append(dict(
+            showarrow=False,
+            x=x_cnt, y=y_cnt, z=z_max,
+            text=f'<b>#{iz+1}</b>',
+            font=dict(color='white', size=11),
+            bgcolor='rgba(0, 0, 0, 0.3)',
+            xanchor='center', yanchor='middle',
+            hovertext=f'{z_max} {labels[iz]}'))
+   
+    # mesh3d doesn't currently support showLegend param, so
+    # add invisible scatter3d with names to show legend
+    for i, label in enumerate(labels):
+        fig.add_trace(go.Scatter3d(
+            x=[None], y=[None], z=[None],
+            opacity=0,
+            name=f'#{i+1} {label}'))
+
+    fig.update_layout(
+        width=width, height=height,
+        title=title, title_x=0.5,
+        scene=dict(
+            xaxis=dict(showticklabels=False, title=''),
+            yaxis=dict(showticklabels=False, title=''),
+            zaxis=dict(title=z_title),
+            annotations=ann),
+        coloraxis=dict(
+            colorscale=colorscale,
+            colorbar=dict(
+                title=dict(
+                    text=z_title,
+                    side='right'),
+                xanchor='right', x=1.0,
+                xpad=0,
+                ticks='inside')),
+        legend=dict(
+            yanchor='top', y=1.0,
+            xanchor='left', x=0.0,
+            bgcolor='rgba(0, 0, 0, 0)',
+            itemclick=False,
+            itemdoubleclick=False),
+        showlegend=True)
+    return fig
+
+def BarChart_3D(coords,z_data,thikness=3,width=600,height=600,title='BarChart 3D',z_title='probability',bar_colorscale='Viridis'):
+    ann = []
+    fig = go.Figure()
+
+    for iz, z_max in enumerate(z_data):
+        
+        x_coord = coords[iz][0]
+        y_coord = coords[iz][1]
+        x_min, y_min = x_coord - thikness, y_coord - thikness
+        x_max, y_max = x_coord + thikness, y_coord + thikness
+
+        fig.add_trace(go.Mesh3d(
+            x=[x_min, x_min, x_max, x_max, x_min, x_min, x_max, x_max],
+            y=[y_min, y_max, y_max, y_min, y_min, y_max, y_max, y_min],
+            z=[0, 0, 0, 0, z_max, z_max, z_max, z_max],
+            alphahull=0,
+            intensity=[0, 0, 0, 0, z_max, z_max, z_max, z_max],
+            coloraxis='coloraxis',
+            hoverinfo='skip',
+            ))
+        
+    #add buttom background image
+    fig.add_trace(go.Surface(x=im_x, y=im_y, z=im_z,
+        surfacecolor=buttom_img, 
+        cmin=0, 
+        cmax=255,
+        colorscale=colorscale,
+        showscale=False,
+        lighting_diffuse=1,
+        lighting_ambient=1,
+        lighting_fresnel=1,
+        lighting_roughness=1,
+        lighting_specular=0.5,
+    ))
+
+    fig.update_layout(
+        width=width, height=height,
+        title=title, title_x=0.5,
+        scene=dict(
+            aspectratio=dict(x=1, y=0.75, z=0.75),
+            xaxis=dict(showticklabels=False,range=[0,400], title=''),
+            yaxis=dict(showticklabels=False,range=[0,300], title=''),
+            zaxis=dict(title=z_title),
+            camera=dict(
+                up=dict(
+                    x=0,
+                    y=0,
+                    z=1
+                ),
+                eye=dict(
+                    x=-0.5,
+                    y=-1,
+                    z=0.6,
+                )
+            ),
+            ),
+        coloraxis=dict(
+            colorscale=bar_colorscale,
+            colorbar=dict(
+                title=dict(
+                    text=z_title,
+                    side='right'),
+                xanchor='right', x=1.0,
+                xpad=0,
+                ticks='inside')),
+        legend=dict(
+            yanchor='top', y=1.0,
+            xanchor='left', x=0.0,
+            bgcolor='rgba(0, 0, 0, 0)',
+            itemclick=False,
+            itemdoubleclick=False),
+        showlegend=False,
+        )
+    fig.update_coloraxes(showscale=False)
+        
+    fig.show()
     
 
 def ShowGridWorlds(grids_dict,title = ''):
@@ -125,7 +289,7 @@ def ShowDynamics(dynamic_track,dir,width,height,grid):
             fig.add_trace(go.Scatter(x=x,y=y,mode='markers',
                                      marker_symbol = 'circle',
                                      marker_color = "red",
-                                     marker_size=t[4]*3,))
+                                     marker_size=t[4]*5,))
             continue
         
         x.append(t[0])
@@ -135,7 +299,7 @@ def ShowDynamics(dynamic_track,dir,width,height,grid):
         x.append(mid_x)
         y.append(mid_y)
         fig.add_trace(go.Scatter(x=x,y=y,mode='lines',
-                                 line=dict(color='red', width=t[4]*5)))
+                                 line=dict(color='red', width=t[4]*10)))
     fig.update_layout(
         title='Dynamics',
         autosize=False,
