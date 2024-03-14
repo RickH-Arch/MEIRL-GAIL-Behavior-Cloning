@@ -337,6 +337,12 @@ class GridWorld:
         df_expert_trajs['trajs'] = df_expert_trajs['trajs'].apply(lambda x:eval(x))
         return df_expert_trajs
     
+    def SetTransitionProb(self,prob):
+        self.trans_prob = prob
+        #transition probability
+        self.dynamics = self.GetTransitionMat()
+        #仅记录active的dynamics，系数需要经过state_fid转换
+        self.dynamics_fid = self.GetTransitionMatActived()
     
 #------------------------------------utils method------------------------------------------
     def CoordToState(self,coord):

@@ -9,13 +9,13 @@ env_folder_path = 'wifi_track_data/dacang/grid_data/env_imgs/40_30'
 expert_traj_path = "wifi_track_data/dacang/track_data/trajs_sliced_0229_40x30.csv"
 
 #env_folder_path = "wifi_track_data/dacang/grid_data/envs_grid/0117_40x30"
-feature_folder_path = "wifi_track_data/dacang/grid_data/features_grid/0117_40x30"
+#feature_folder_path = "wifi_track_data/dacang/grid_data/features_grid/0117_40x30"
 
 
 world = GridWorld(
                   expert_traj_filePath=expert_traj_path,
                   environments_img_folderPath=env_folder_path,
-                  width=40, height=30,discount=0.95,trans_prob=0.6)
+                  width=40, height=30,discount=0.95,trans_prob=0.8)
 # df_cluster = pd.read_csv('wifi_track_data/dacang/cluster_data/cluster_result_0203.csv')
 # world.experts.ReadCluster(df_cluster)
 # world.experts.ApplyCluster((0,1,2))
