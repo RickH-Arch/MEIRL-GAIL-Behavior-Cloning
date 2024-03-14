@@ -36,6 +36,7 @@ class DeepMEIRL_FC(nn.Module):
         self.net.append(nn.Linear(n_input,1))
         #self.net.append(nn.Sigmoid())
         self.net.append(nn.ReLU())
+        #self.net.append(nn.Tanh())
         self.net = nn.Sequential(*self.net)
 
         #Xavier Initialize
